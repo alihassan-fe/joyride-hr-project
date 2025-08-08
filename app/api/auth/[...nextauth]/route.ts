@@ -1,1 +1,5 @@
-export { handlers as GET, handlers as POST } from "@/lib/auth-next"
+import NextAuth from "@/lib/auth-next"
+
+const handler = NextAuth
+
+export { handler as GET, handler as POST }

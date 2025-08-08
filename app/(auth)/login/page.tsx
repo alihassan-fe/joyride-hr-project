@@ -25,12 +25,12 @@ export default function LoginPage() {
     const res = await signIn("credentials", {
       email,
       password,
-      callbackUrl: "/dashboard/applicants",
+      callbackUrl: "/applicants",
       redirect: false,
     })
     setLoading(null)
     if (res?.ok) {
-      window.location.href = res.url || "/dashboard/applicants"
+      window.location.href = res.url || "/applicants"
     } else {
       setError("Invalid email or password")
     }
@@ -39,7 +39,7 @@ export default function LoginPage() {
   async function doSSO(provider: "google" | "azure-ad") {
     setError("")
     setLoading(provider)
-    await signIn(provider, { callbackUrl: "/dashboard/applicants" })
+    await signIn(provider, { callbackUrl: "/applicants" })
   }
 
   return (
@@ -95,10 +95,10 @@ export default function LoginPage() {
               <img src="/placeholder.svg?height=20&width=20" alt="" className="h-4 w-4 mr-2" />
               {loading === "google" ? "Redirecting..." : "Continue with Google"}
             </Button>
-            <Button variant="outline" className="w-full" onClick={() => doSSO("azure-ad")} disabled={loading !== null}>
+            {/* <Button variant="outline" className="w-full" onClick={() => doSSO("azure-ad")} disabled={loading !== null}>
               <img src="/placeholder.svg?height=20&width=20" alt="" className="h-4 w-4 mr-2" />
               {loading === "azure-ad" ? "Redirecting..." : "Continue with Microsoft"}
-            </Button>
+            </Button> */}
           </div>
 
           <p className="text-xs text-neutral-500">

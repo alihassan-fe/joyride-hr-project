@@ -1,10 +1,11 @@
-import NextAuth, { type NextAuthConfig } from "next-auth"
+import NextAuth, { type NextAuthOptions } from "next-auth"
+import { getServerSession } from "next-auth"
 import Google from "next-auth/providers/google"
 import AzureAD from "next-auth/providers/azure-ad"
 import Credentials from "next-auth/providers/credentials"
 import { getSql } from "@/lib/sql"
 
-export const authConfig = {
+export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   secret: process.env.AUTH_SECRET,
   providers: [
@@ -28,8 +29,12 @@ export const authConfig = {
             AND password_hash = crypt(${password}, password_hash)
           LIMIT 1
         `
-        if (rows.length === 0) return null
-        const user = rows[0] as { id: string; email: string; name: string | null; role: string | null }
+        
+        // Handle the SQL result properly
+        const userRows = Array.isArray(rows) ? rows : []
+        if (userRows.length === 0) return null
+        
+        const user = userRows[0] as { id: string; email: string; name: string | null; role: string | null }
 
         return {
           id: user.id,
@@ -51,14 +56,14 @@ export const authConfig = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: any; user: any }) {
       // When logging in via any provider, copy role if present
       if (user && (user as any).role) {
         token.role = (user as any).role
       }
       return token
     },
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: any }) {
       if (session?.user) {
         ;(session.user as any).id = token.sub
         ;(session.user as any).role = (token as any).role || "Authenticated"
@@ -66,6 +71,11 @@ export const authConfig = {
       return session
     },
   },
-} satisfies NextAuthConfig
+}
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authConfig)
+export default NextAuth(authOptions)
+
+// Export getServerSession for use in server components
+export const auth = async () => {
+  return await getServerSession(authOptions)
+}
