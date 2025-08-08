@@ -25,12 +25,12 @@ export default function LoginPage() {
     const res = await signIn("credentials", {
       email,
       password,
-      callbackUrl: "/applicants",
+      callbackUrl: "/dashboard/applicants",
       redirect: false,
     })
     setLoading(null)
     if (res?.ok) {
-      window.location.href = res.url || "/applicants"
+      window.location.href = res.url || "/dashboard/applicants"
     } else {
       setError("Invalid email or password")
     }
@@ -39,7 +39,7 @@ export default function LoginPage() {
   async function doSSO(provider: "google" | "azure-ad") {
     setError("")
     setLoading(provider)
-    await signIn(provider, { callbackUrl: "/applicants" })
+    await signIn(provider, { callbackUrl: "/dashboard/applicants" })
   }
 
   return (

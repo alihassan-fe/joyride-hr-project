@@ -1,16 +1,15 @@
-import NextAuth, { NextAuthOptions } from "next-auth"
-import GoogleProvider from "next-auth/providers/google"
-import AzureADProvider from "next-auth/providers/azure-ad"
-import CredentialsProvider from "next-auth/providers/credentials"
+import NextAuth, { type NextAuthConfig } from "next-auth"
+import Google from "next-auth/providers/google"
+import AzureAD from "next-auth/providers/azure-ad"
+import Credentials from "next-auth/providers/credentials"
 import { getSql } from "@/lib/sql"
-import bcrypt from "bcryptjs"
 
-export const authOptions: NextAuthOptions = {
+export const authConfig = {
   session: { strategy: "jwt" },
   secret: process.env.AUTH_SECRET,
   providers: [
     // Manual email + password login
-    CredentialsProvider({
+    Credentials({
       name: "Email and Password",
       credentials: {
         email: { label: "Email", type: "email" },
@@ -23,17 +22,14 @@ export const authOptions: NextAuthOptions = {
 
         const sql = getSql()
         const rows = await sql/* sql */`
-          SELECT id, email, name, role, password_hash
+          SELECT id, email, name, role
           FROM users
           WHERE email = ${email}
+            AND password_hash = crypt(${password}, password_hash)
           LIMIT 1
-        ` as any[]
-        
+        `
         if (rows.length === 0) return null
-        const user = rows[0] as { id: string; email: string; name: string | null; role: string | null; password_hash: string }
-
-        const ok = await bcrypt.compare(password, user.password_hash)
-        if (!ok) return null
+        const user = rows[0] as { id: string; email: string; name: string | null; role: string | null }
 
         return {
           id: user.id,
@@ -44,25 +40,25 @@ export const authOptions: NextAuthOptions = {
       },
     }),
     // SSO providers (keep existing)
-    GoogleProvider({
+    Google({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
-    AzureADProvider({
+    AzureAD({
       clientId: process.env.AZURE_AD_CLIENT_ID || "",
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET || "",
       tenantId: process.env.AZURE_AD_TENANT_ID || "common",
     }),
   ],
   callbacks: {
-    async jwt({ token, user }: { token: any; user: any }) {
+    async jwt({ token, user }) {
       // When logging in via any provider, copy role if present
       if (user && (user as any).role) {
         token.role = (user as any).role
       }
       return token
     },
-    async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }) {
       if (session?.user) {
         ;(session.user as any).id = token.sub
         ;(session.user as any).role = (token as any).role || "Authenticated"
@@ -70,6 +66,6 @@ export const authOptions: NextAuthOptions = {
       return session
     },
   },
-}
+} satisfies NextAuthConfig
 
-export default NextAuth(authOptions)
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig)
