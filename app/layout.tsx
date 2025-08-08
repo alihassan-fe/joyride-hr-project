@@ -1,7 +1,14 @@
 import type { Metadata } from 'next'
-import { GeistSans } from 'geist/font/sans'
+import { Poppins } from 'next/font/google'
 import { GeistMono } from 'geist/font/mono'
 import './globals.css'
+
+// Import Poppins from Google Fonts
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'], // choose weights you need
+  variable: '--font-sans', // so you can use it in CSS
+})
 
 export const metadata: Metadata = {
   title: 'v0 App',
@@ -15,16 +22,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <head>
-        <style>{`
-html {
-  font-family: ${GeistSans.style.fontFamily};
-  --font-sans: ${GeistSans.variable};
-  --font-mono: ${GeistMono.variable};
-}
-        `}</style>
-      </head>
+    <html lang="en" className={`${poppins.variable} ${GeistMono.variable}`}>
       <body>{children}</body>
     </html>
   )

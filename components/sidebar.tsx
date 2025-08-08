@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Bot, FileText, LogOut, Users } from 'lucide-react'
+import { Bot, FileText, LogOut, Users, LayoutDashboard  } from 'lucide-react'
 import { signOut } from "next-auth/react"
 
 type Props = {
@@ -13,14 +13,14 @@ type Props = {
 export function Sidebar({ user = { email: "user@example.com", role: "Authenticated" } }: Props) {
   const pathname = usePathname()
   const items = [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard  },
     { href: "/applicants", label: "Applicants", icon: FileText },
     { href: "/employees", label: "Employees", icon: Users },
-    { href: "/insights", label: "Insights", icon: Bot },
   ]
   return (
     <aside className="border-r min-h-[100dvh] p-4 md:p-6 bg-neutral-50">
       <div className="mb-8">
-        <Link href="/applicants" className="font-semibold">Acme HR</Link>
+        <Link href="/applicants" className="font-semibold">Joyride HR</Link>
         <div className="text-xs text-neutral-500 mt-1">{user.email}</div>
         <div className="text-xs text-neutral-600 mt-1">Role: {user.role}</div>
       </div>

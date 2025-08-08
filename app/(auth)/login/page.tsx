@@ -47,7 +47,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md border-neutral-200">
         <CardHeader>
           <CardTitle className="text-2xl">Sign in</CardTitle>
-          <CardDescription>Use your email/password or SSO</CardDescription>
+          <CardDescription>Use your email/password</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6">
           {/* Manual login */}
@@ -92,7 +92,7 @@ export default function LoginPage() {
           {/* SSO buttons */}
           <div className="grid gap-2">
             <Button variant="outline" className="w-full" onClick={() => doSSO("google")} disabled={loading !== null}>
-              <img src="/placeholder.svg?height=20&width=20" alt="" className="h-4 w-4 mr-2" />
+              <img src="/google.svg" alt="" className="h-4 w-4 mr-2" />
               {loading === "google" ? "Redirecting..." : "Continue with Google"}
             </Button>
             {/* <Button variant="outline" className="w-full" onClick={() => doSSO("azure-ad")} disabled={loading !== null}>
@@ -100,10 +100,6 @@ export default function LoginPage() {
               {loading === "azure-ad" ? "Redirecting..." : "Continue with Microsoft"}
             </Button> */}
           </div>
-
-          <p className="text-xs text-neutral-500">
-            Forgot password? Ask an admin to reset it for now.
-          </p>
         </CardContent>
       </Card>
     </main>

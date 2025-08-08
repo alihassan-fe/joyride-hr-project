@@ -83,9 +83,6 @@ export function AIChatFloating() {
             <SheetHeader>
               <SheetTitle>AI Assistant</SheetTitle>
             </SheetHeader>
-            <Button variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close chat">
-              <X className="h-5 w-5" />
-            </Button>
           </div>
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-3">
@@ -112,9 +109,6 @@ export function AIChatFloating() {
                 <Send className="h-4 w-4" />
               </Button>
             </div>
-            <p className="text-xs text-neutral-500 mt-2">
-              The assistant uses the AI SDK. If no model key is set, it will run a local heuristic. [Docs cited below]
-            </p>
           </div>
         </SheetContent>
       </Sheet>
