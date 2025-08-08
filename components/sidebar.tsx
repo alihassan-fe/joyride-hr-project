@@ -1,17 +1,17 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Bot, FileText, LogOut, Users } from 'lucide-react'
+import { signOut } from "next-auth/react"
 
 type Props = {
   user?: { email?: string; role?: string }
 }
-export function Sidebar({ user = { email: "user@example.com", role: "Viewer" } }: Props) {
+export function Sidebar({ user = { email: "user@example.com", role: "Authenticated" } }: Props) {
   const pathname = usePathname()
-  const router = useRouter()
   const items = [
     { href: "/dashboard/applicants", label: "Applicants", icon: FileText },
     { href: "/dashboard/employees", label: "Employees", icon: Users },
@@ -50,10 +50,11 @@ export function Sidebar({ user = { email: "user@example.com", role: "Viewer" } }
           <Bot className="h-4 w-4 mr-2" />
           AI Assistant
         </Button>
-        <Button variant="ghost" className="justify-start text-red-600 hover:text-red-700" onClick={async () => {
-          await fetch("/api/auth/logout", { method: "POST" })
-          router.push("/login")
-        }}>
+        <Button
+          variant="ghost"
+          className="justify-start text-red-600 hover:text-red-700"
+          onClick={() => signOut({ callbackUrl: "/login" })}
+        >
           <LogOut className="h-4 w-4 mr-2" />
           Sign out
         </Button>

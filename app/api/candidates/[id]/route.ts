@@ -1,15 +1,36 @@
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "@/lib/db"
+import { getSql } from "@/lib/sql"
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
-  const c = db.candidates.get(params.id)
-  if (!c) return NextResponse.json({ error: "Not found" }, { status: 404 })
-  return NextResponse.json({ data: c })
+  const sql = getSql()
+  const rows = await sql/* sql */`
+    SELECT id, name, email, phone, cv_url, status, scores, applied_job_id, job_title, skills, work_history, notes, created_at
+    FROM candidates
+    WHERE id = ${params.id}::uuid
+  `
+  if (rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  return NextResponse.json({ data: rows[0] })
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const body = await req.json().catch(() => ({}))
-  const updated = db.candidates.update(params.id, body)
-  if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 })
-  return NextResponse.json({ data: updated })
+  const sql = getSql()
+  const patch = await req.json().catch(() => ({}))
+  const [row] = await sql/* sql */`
+    UPDATE candidates SET
+      name = COALESCE(${patch.name}, name),
+      email = COALESCE(${patch.email}, email),
+      phone = COALESCE(${patch.phone}, phone),
+      cv_url = COALESCE(${patch.cv_url}, cv_url),
+      status = COALESCE(${patch.status}, status),
+      scores = COALESCE(${patch.scores ? JSON.stringify(patch.scores) : null}::jsonb, scores),
+      applied_job_id = COALESCE(${patch.applied_job_id}, applied_job_id),
+      job_title = COALESCE(${patch.job_title}, job_title),
+      skills = COALESCE(${patch.skills ? JSON.stringify(patch.skills) : null}::jsonb, skills),
+      work_history = COALESCE(${patch.work_history ? JSON.stringify(patch.work_history) : null}::jsonb, work_history),
+      notes = COALESCE(${patch.notes}, notes)
+    WHERE id = ${params.id}::uuid
+    RETURNING id, name, email, phone, cv_url, status, scores, applied_job_id, job_title, skills, work_history, notes, created_at
+  `
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  return NextResponse.json({ data: row })
 }

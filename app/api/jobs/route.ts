@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server"
-import { db } from "@/lib/db"
+import { getSql } from "@/lib/sql"
 
 export async function GET() {
-  const jobs = db.jobs.list()
-  return NextResponse.json({ data: jobs })
+  const sql = getSql()
+  const rows = await sql/* sql */`
+    SELECT id, title, description, requirements, created_at
+    FROM jobs
+    ORDER BY created_at DESC
+  `
+  return NextResponse.json({ data: rows })
 }
