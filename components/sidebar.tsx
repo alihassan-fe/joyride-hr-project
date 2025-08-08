@@ -13,13 +13,13 @@ export function Sidebar({ user = { email: "user@example.com", role: "Viewer" } }
   const pathname = usePathname()
   const router = useRouter()
   const items = [
-    { href: "/dashboard/applicants", label: "Applicants", icon: FileText },
-    { href: "/dashboard/employees", label: "Employees", icon: Users },
+    { href: "/applicants", label: "Applicants", icon: FileText },
+    { href: "/employees", label: "Employees", icon: Users },
   ]
   return (
     <aside className="border-r min-h-[100dvh] p-4 md:p-6 bg-neutral-50">
       <div className="mb-8">
-        <Link href="/dashboard/applicants" className="font-semibold">Acme HR</Link>
+        <Link href="/applicants" className="font-semibold">Acme HR</Link>
         <div className="text-xs text-neutral-500 mt-1">{user.email}</div>
         <div className="text-xs text-neutral-600 mt-1">Role: {user.role}</div>
       </div>

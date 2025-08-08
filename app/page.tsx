@@ -8,7 +8,7 @@ export default async function Home() {
   const token = cookieStore.get("hr_session")?.value
   const session = token ? await decodeSession(token).catch(() => null) : null
   if (session) {
-    redirect("/dashboard/applicants")
+    redirect("/applicants")
   }
   redirect("/login")
 }
