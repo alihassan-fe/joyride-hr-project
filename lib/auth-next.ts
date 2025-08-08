@@ -1,16 +1,16 @@
-import NextAuth, { type NextAuthConfig } from "next-auth"
-import Google from "next-auth/providers/google"
-import AzureAD from "next-auth/providers/azure-ad"
-import Credentials from "next-auth/providers/credentials"
+import NextAuth, { NextAuthOptions } from "next-auth"
+import GoogleProvider from "next-auth/providers/google"
+import AzureADProvider from "next-auth/providers/azure-ad"
+import CredentialsProvider from "next-auth/providers/credentials"
 import { getSql } from "@/lib/sql"
 import bcrypt from "bcryptjs"
 
-export const authConfig = {
+export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   secret: process.env.AUTH_SECRET,
   providers: [
     // Manual email + password login
-    Credentials({
+    CredentialsProvider({
       name: "Email and Password",
       credentials: {
         email: { label: "Email", type: "email" },
@@ -27,7 +27,8 @@ export const authConfig = {
           FROM users
           WHERE email = ${email}
           LIMIT 1
-        `
+        ` as any[]
+        
         if (rows.length === 0) return null
         const user = rows[0] as { id: string; email: string; name: string | null; role: string | null; password_hash: string }
 
@@ -43,25 +44,25 @@ export const authConfig = {
       },
     }),
     // SSO providers (keep existing)
-    Google({
+    GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
-    AzureAD({
+    AzureADProvider({
       clientId: process.env.AZURE_AD_CLIENT_ID || "",
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET || "",
       tenantId: process.env.AZURE_AD_TENANT_ID || "common",
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: any; user: any }) {
       // When logging in via any provider, copy role if present
       if (user && (user as any).role) {
         token.role = (user as any).role
       }
       return token
     },
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: any }) {
       if (session?.user) {
         ;(session.user as any).id = token.sub
         ;(session.user as any).role = (token as any).role || "Authenticated"
@@ -69,6 +70,6 @@ export const authConfig = {
       return session
     },
   },
-} satisfies NextAuthConfig
+}
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authConfig)
+export default NextAuth(authOptions)

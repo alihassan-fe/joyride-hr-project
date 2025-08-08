@@ -1,10 +1,11 @@
-import { auth } from "@/lib/auth-next"
+import { getServerSession } from "next-auth/next"
+import { authOptions } from "@/lib/auth-next"
 import { redirect } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { AIChatFloating } from "@/components/ai-chat-floating"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth()
+  const session = await getServerSession(authOptions)
   if (!session?.user) {
     redirect("/login")
   }
