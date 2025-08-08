@@ -1,34 +1,61 @@
 import { NextRequest, NextResponse } from "next/server"
+import { put } from "@vercel/blob"
+import { generateText } from "ai"
+import { openai } from "@ai-sdk/openai"
 
-// Mock "parser" for PDFs, since we don't access OpenAI here.
 // Accepts multipart/form-data with fields: file (pdf), applied_job_id
 export async function POST(req: NextRequest) {
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: "OPENAI_API_KEY not set" }, { status: 500 })
+  }
   const formData = await req.formData().catch(() => null)
   if (!formData) return NextResponse.json({ error: "invalid form data" }, { status: 400 })
+
   const file = formData.get("file") as File | null
-  const jobId = String(formData.get("applied_job_id") || "")
+  const applied_job_id = String(formData.get("applied_job_id") || "")
   if (!file) return NextResponse.json({ error: "file required" }, { status: 400 })
-  const fileName = file.name || "resume.pdf"
-  // Heuristic fake parse
-  const baseName = fileName.replace(/\.[^/.]+$/, "")
-  const name = baseName.replace(/[_\-]/g, " ").split(" ").map(w => w[0]?.toUpperCase() + w.slice(1)).join(" ") || "Unknown Candidate"
-  const skills = ["JavaScript","React","SQL","Node.js","Tailwind"].sort(() => 0.5 - Math.random()).slice(0, 3)
-  const work = [
-    "Software Engineer at Example Corp (2021-2024)",
-    "Frontend Developer at Web Inc (2019-2021)",
-    "Intern at Dev LLC (2018-2019)"
-  ].sort(() => 0.5 - Math.random()).slice(0, 2)
-  const data = {
-    name,
-    email: `${baseName.toLowerCase().replace(/\s+/g, ".")}@example.com`,
-    phone: "+1 555-0100",
-    cv_url: "",
-    status: "New",
-    scores: { overall: 6 + Math.floor(Math.random()*4) },
-    applied_job_id: jobId,
-    job_title: "",
-    skills,
-    work_history: work
+
+  // Upload to Blob storage
+  const arrayBuffer = await file.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+  const uploaded = await put(`cvs/${Date.now()}-${file.name}`, buffer, {
+    access: "public",
+    contentType: file.type || "application/pdf",
+  })
+
+  // Ask the model to extract structured data
+  const pdfName = file.name
+  const { text } = await generateText({
+    model: openai("gpt-4o"),
+    system: "You extract structured candidate data from resumes. Respond ONLY in JSON.",
+    prompt: `
+Parse the following resume. Return JSON with keys:
+{name, email, phone, skills: string[], work_history: string[], scores: {overall: number between 0 and 10}, job_title?: string}
+
+Resume filename: ${pdfName}
+Resume URL: ${uploaded.url}
+`,
+  })
+
+  let parsed: any
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return NextResponse.json({ error: "Failed to parse AI output" }, { status: 500 })
   }
+
+  const data = {
+    name: parsed.name || "",
+    email: parsed.email || "",
+    phone: parsed.phone || "",
+    cv_url: uploaded.url,
+    status: "New",
+    scores: parsed.scores || { overall: 0 },
+    applied_job_id,
+    job_title: parsed.job_title || "",
+    skills: Array.isArray(parsed.skills) ? parsed.skills : [],
+    work_history: Array.isArray(parsed.work_history) ? parsed.work_history : [],
+  }
+
   return NextResponse.json({ data })
 }
