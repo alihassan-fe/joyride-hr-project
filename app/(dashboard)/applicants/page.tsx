@@ -1,212 +1,341 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileUp, Filter, Search, Upload } from 'lucide-react'
-import type { Candidate, CandidateStatus, Job } from "@/lib/types"
-import { CandidateDrawer } from "@/components/candidate-drawer"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
+import { ExternalLink, RefreshCw, FileText, Info, Upload } from "lucide-react"
 import { ManualUpload } from "@/components/manual-upload"
+import { Input } from "@/components/ui/input" 
 
-type Filters = {
-  q: string
-  status: CandidateStatus | "All"
-  minScore: number
-  jobId: string | "All"
+// Match the data structure coming from the webhook
+export type WebhookCandidate = {
+  id: number
+  name: string
+  email: string
+  phone: string
+  cvLink?: string
+  dispatch?: number
+  operationsManager?: number
+  strengths?: string[]
+  weaknesses?: string[]
+  notes?: string
+  recommendation?: string // 'Remove' | 'Consider' | undefined
 }
 
-const defaultFilters: Filters = { q: "", status: "All", minScore: 0, jobId: "All" }
+// Use the same webhook as the Dashboard
+const WEBHOOK_URL = "https://oriormedia.app.n8n.cloud/webhook/candidates"
 
 export default function ApplicantsPage() {
-  const [filters, setFilters] = useState<Filters>(defaultFilters)
-  const [candidates, setCandidates] = useState<Candidate[]>([])
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [selected, setSelected] = useState<Candidate | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<WebhookCandidate[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string>("")
 
-  async function load() {
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogTitle, setDialogTitle] = useState("")
+  const [dialogItems, setDialogItems] = useState<string[]>([])
+
+  const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 10
+
+  async function fetchData() {
     setLoading(true)
-    const [candRes, jobsRes] = await Promise.all([fetch("/api/candidates"), fetch("/api/jobs")])
-    const c = await candRes.json()
-    const j = await jobsRes.json()
-    setCandidates(c.data || [])
-    setJobs(j.data || [])
-    setLoading(false)
+    setError("")
+    try {
+      const res = await fetch(WEBHOOK_URL, { cache: "no-store" })
+      if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`)
+      const json = (await res.json()) as WebhookCandidate[] | { data: WebhookCandidate[] }
+      const arr = Array.isArray(json) ? json : (json as any).data
+      if (!Array.isArray(arr)) throw new Error("Unexpected response shape")
+      setData(arr.length > 0 ? arr : [])
+    } catch (e: any) {
+      setError(e.message || "Failed to fetch applicants")
+      setData([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    load()
+    fetchData()
   }, [])
 
-  const filtered = useMemo(() => {
-    return candidates.filter((c) => {
-      if (filters.status !== "All" && c.status !== filters.status) return false
-      if (filters.jobId !== "All" && c.applied_job_id !== filters.jobId) return false
-      const score = typeof c.scores?.overall === "number" ? c.scores!.overall : 0
-      if (score < filters.minScore) return false
-      const q = filters.q.toLowerCase()
-      if (q) {
-        const blob = `${c.name} ${c.email} ${c.phone} ${c.skills?.join(" ")} ${c.job_title || ""}`.toLowerCase()
-        if (!blob.includes(q)) return false
-      }
-      return true
-    })
-  }, [candidates, filters])
+  // Filter applicants by search
+  const filteredData = data.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.email.toLowerCase().includes(search.toLowerCase()) ||
+      c.phone.toLowerCase().includes(search.toLowerCase())
+  )
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredData.length / PAGE_SIZE)
+  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+
+  function openListDialog(title: string, items: string[] = []) {
+    setDialogTitle(title)
+    setDialogItems(items)
+    setDialogOpen(true)
+  }
+  
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between flex-wrap gap-3">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold">Applicants</h1>
-          <p className="text-sm text-neutral-500">Search, filter, and manage candidates</p>
+          <p className="text-sm text-neutral-500">Listing all applicants</p>
         </div>
         <div className="flex items-center gap-2">
-          <ManualUpload onAdded={async () => load()} />
-          <Button variant="outline" onClick={() => load()}>
-            <Upload className="h-4 w-4 mr-2" />
-            Refresh
+          <ManualUpload onAdded={fetchData} />
+          <Button variant="outline" onClick={fetchData} disabled={loading}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            {loading ? "Refreshing..." : "Refresh"}
           </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-2">
-          <CardTitle className="text-base">Filters</CardTitle>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-            <div className="md:col-span-2">
-              <Label className="sr-only">Search</Label>
-              <div className="relative">
-                <Search className="h-4 w-4 absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400" />
-                <Input
-                  placeholder="Search name, email, skills..."
-                  className="pl-8"
-                  value={filters.q}
-                  onChange={(e) => setFilters({ ...filters, q: e.target.value })}
-                />
-              </div>
-            </div>
-            <div>
-              <Label className="sr-only">Status</Label>
-              <Select
-                value={filters.status}
-                onValueChange={(v) => setFilters({ ...filters, status: v as Filters["status"] })}
-              >
-                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
-                <SelectContent>
-                  {["All","New","Reviewed","Shortlisted","Interview","Hired","Rejected"].map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="sr-only">Min Score</Label>
-              <Select
-                value={String(filters.minScore)}
-                onValueChange={(v) => setFilters({ ...filters, minScore: Number(v) })}
-              >
-                <SelectTrigger><SelectValue placeholder="Min Score" /></SelectTrigger>
-                <SelectContent>
-                  {[0,3,5,7,8,9].map((n) => (
-                    <SelectItem key={n} value={String(n)}>{`Score ≥ ${n}`}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="sr-only">Job</Label>
-              <Select
-                value={filters.jobId}
-                onValueChange={(v) => setFilters({ ...filters, jobId: v as Filters["jobId"] })}
-              >
-                <SelectTrigger><SelectValue placeholder="Job" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">All Jobs</SelectItem>
-                  {jobs.map((j) => (
-                    <SelectItem key={j.id} value={j.id}>{j.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+      {/* Error state */}
+      {error && (
+        <Card className="border-red-200">
+          <CardHeader>
+            <CardTitle className="text-sm text-red-700">Failed to load applicants</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-red-600">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Search input */}
+      <div className="max-w-sm">
+        <Input
+          placeholder="Search by name, email, or phone..."
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setPage(1) // Reset to first page on search
+          }}
+        />
+      </div>
+
+      {/* Applicants Table (mirrors Dashboard table) */}
+      <Card className="rounded-2xl shadow-md">
+        <CardHeader>
+          <CardTitle className="text-base">Applicants</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 mb-3 text-neutral-500">
-            <Filter className="h-4 w-4" />
-            <span className="text-sm">{filtered.length} of {candidates.length} candidates</span>
-          </div>
-          <div className="border rounded-md overflow-hidden">
-            <Table>
+          <div className="border rounded-md overflow-x-auto w-full max-w-[1190px]">
+            <Table className="w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Job</TableHead>
-                  <TableHead>Applied</TableHead>
+                  <TableHead className="min-w-[150px] whitespace-nowrap">Name</TableHead>
+                  <TableHead className="min-w-[200px] whitespace-nowrap">Email</TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">Phone</TableHead>
+                  <TableHead className="min-w-[80px] whitespace-nowrap">Dispatch</TableHead>
+                  <TableHead className="min-w-[100px] whitespace-nowrap">Ops Manager</TableHead>
+                  <TableHead className="min-w-[80px] whitespace-nowrap">CV</TableHead>
+                  <TableHead className="min-w-[100px] whitespace-nowrap">Strengths</TableHead>
+                  <TableHead className="min-w-[100px] whitespace-nowrap">Weaknesses</TableHead>
+                  <TableHead className="min-w-[200px]">
+                    <span className="text-sm font-medium text-neutral-600">Notes</span>
+                  </TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">
+                    <span className="text-sm font-medium text-neutral-600">Recommendation</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {!loading && filtered.map((c) => (
-                  <TableRow
-                    key={c.id}
-                    className="cursor-pointer hover:bg-neutral-50"
-                    onClick={() => setSelected(c)}
-                  >
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell><StatusBadge status={c.status} /></TableCell>
-                    <TableCell>{c.scores?.overall ?? "-"}</TableCell>
-                    <TableCell>{jobs.find(j => j.id === c.applied_job_id)?.title ?? "-"}</TableCell>
-                    <TableCell>{new Date(c.created_at || Date.now()).toLocaleDateString()}</TableCell>
+                {loading &&
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="min-w-[150px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[140px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[200px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[180px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[60px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[60px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[200px]">
+                        <div className="h-4 w-full max-w-[180px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                {!loading &&
+                  data.map((c) => (
+                    <TableRow key={c.id} className="hover:bg-neutral-50">
+                      <TableCell className="font-medium min-w-[150px] whitespace-nowrap">{c.name}</TableCell>
+                      <TableCell className="text-neutral-600 min-w-[200px] whitespace-nowrap">{c.email}</TableCell>
+                      <TableCell className="text-neutral-600 min-w-[120px] whitespace-nowrap">{c.phone}</TableCell>
+                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                        {typeof c.dispatch === "number" ? c.dispatch : "-"}
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        {typeof c.operationsManager === "number" ? c.operationsManager : "-"}
+                      </TableCell>
+                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                        {c.cvLink ? (
+                          <a
+                            href={c.cvLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center text-sm text-neutral-700 hover:underline"
+                          >
+                            <FileText className="h-4 w-4 mr-1.5" />
+                            Open
+                            <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                          </a>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openListDialog(`Strengths — ${c.name}`, c.strengths || [])}
+                          disabled={!c.strengths || c.strengths.length === 0}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openListDialog(`Weaknesses — ${c.name}`, c.weaknesses || [])}
+                          disabled={!c.weaknesses || c.weaknesses.length === 0}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                      <TableCell className="min-w-[200px]">
+                        {c.notes ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center gap-1 max-w-[180px] truncate cursor-help">
+                                  <Info className="h-3.5 w-3.5 text-neutral-500" />
+                                  <span className="text-neutral-700">{c.notes}</span>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="text-xs">{c.notes}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
+                        <RecommendationBadge value={c.recommendation} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                {!loading && data.length === 0 && !error && (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-sm text-neutral-500">
+                      No applicants found from the webhook.
+                    </TableCell>
                   </TableRow>
-                ))}
-                {loading && (
-                  <TableRow><TableCell colSpan={5}>Loading...</TableCell></TableRow>
-                )}
-                {!loading && filtered.length === 0 && (
-                  <TableRow><TableCell colSpan={5}>No candidates match your filters.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
+           {/* Pagination controls */}
+          <div className="flex justify-end items-center gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === 1}
+              onClick={() => setPage(page - 1)}
+            >
+              Prev
+            </Button>
+            <span className="text-sm">
+              Page {page} of {totalPages || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === totalPages || totalPages === 0}
+              onClick={() => setPage(page + 1)}
+            >
+              Next
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">n8n ingestion (demo)</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-neutral-600">
-          Configure your n8n workflow to POST parsed CV JSON to <code className="bg-neutral-100 px-1 rounded">/api/n8n/ingest</code>.
-          This page will reflect newly added candidates automatically.
-        </CardContent>
-      </Card>
-
-      <CandidateDrawer
-        candidate={selected}
-        jobs={jobs}
-        onClose={() => setSelected(null)}
-        onUpdated={async () => { await load(); }}
-      />
+      {/* Dialog for strengths/weaknesses */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{dialogTitle}</DialogTitle>
+            <DialogDescription>Click outside to close</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {dialogItems.length > 0 ? (
+              <ul className="list-disc pl-5 space-y-1">
+                {dialogItems.map((item, idx) => (
+                  <li key={idx} className="text-sm text-neutral-800">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-neutral-500">No items.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
-function StatusBadge({ status = "New" as CandidateStatus }) {
-  const map: Record<CandidateStatus, { label: string, className: string }> = {
-    New: { label: "New", className: "bg-neutral-100 text-neutral-700" },
-    Reviewed: { label: "Reviewed", className: "bg-amber-100 text-amber-900" },
-    Shortlisted: { label: "Shortlisted", className: "bg-emerald-100 text-emerald-900" },
-    Interview: { label: "Interview", className: "bg-purple-100 text-purple-900" },
-    Hired: { label: "Hired", className: "bg-green-100 text-green-900" },
-    Rejected: { label: "Rejected", className: "bg-rose-100 text-rose-900" },
+function RecommendationBadge({ value }: { value?: string }) {
+  const v = (value || "").toLowerCase()
+  if (v === "remove") {
+    return <Badge variant="destructive">Remove</Badge>
   }
-  const cfg = map[status]
-  return <Badge className={`${cfg.className} font-normal`} variant="secondary">{cfg.label}</Badge>
+  if (v === "consider") {
+    return (
+      <Badge className="bg-emerald-100 text-emerald-900" variant="secondary">
+        Consider
+      </Badge>
+    )
+  }
+  return (
+    <Badge variant="secondary" className="bg-neutral-100 text-neutral-800">
+      —
+    </Badge>
+  )
 }

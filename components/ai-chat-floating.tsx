@@ -10,7 +10,7 @@ import { Bot, Send, X } from 'lucide-react'
 type Message = { id: string; role: "user" | "assistant"; content: string }
 
 export function AIChatFloating() {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<Message[]>([

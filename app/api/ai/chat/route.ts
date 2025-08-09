@@ -4,30 +4,41 @@ import { streamText } from "ai"
 import { openai } from "@ai-sdk/openai"
 
 export async function POST(req: NextRequest) {
-  if (!process.env.OPENAI_API_KEY) {
-    return new Response("OPENAI_API_KEY not set", { status: 500 })
-  }
-  const body = await req.json().catch(() => null) as { messages?: { role: string; content: string }[] } | null
-  const userMessage = body?.messages?.filter(m => m.role === "user").slice(-1)[0]?.content || ""
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      return new Response(JSON.stringify({ error: "OPENAI_API_KEY not set" }), { status: 500, headers: { "Content-Type": "application/json" } })
+    }
 
-  const sql = getSql()
-  const candidates = await sql/* sql */`
-    SELECT name, status, COALESCE(scores->>'overall','0') AS overall, COALESCE(job_title,'') AS job_title, COALESCE(applied_job_id,'') AS applied_job_id, COALESCE(skills,'[]'::jsonb) AS skills
-    FROM candidates
-    ORDER BY created_at DESC
-    LIMIT 200
-  `
-  const employees = await sql/* sql */`
-    SELECT name, role, pto_balance FROM employees ORDER BY name ASC LIMIT 200
-  `
+    const body = await req.json().catch(() => null) as { messages?: { role: string; content: string }[] } | null
+    const userMessage = body?.messages?.filter(m => m.role === "user").slice(-1)[0]?.content || ""
 
-  const cText = candidates.map((c: any) => `- ${c.name} | score ${c.overall} | status ${c.status} | job ${c.job_title || c.applied_job_id} | skills ${(Array.isArray(c.skills) ? c.skills : []).join(", ")}`).join("\n")
-  const eText = employees.map((e: any) => `- ${e.name} | role ${e.role} | PTO ${e.pto_balance}`).join("\n")
+    let candidates: any[] = []
+    let employees: any[] = []
+    try {
+      const sql = getSql()
+      candidates = await sql/* sql */`
+        SELECT name, status, COALESCE(scores->>'overall','0') AS overall, COALESCE(job_title,'') AS job_title, COALESCE(applied_job_id,'') AS applied_job_id, COALESCE(skills,'[]'::jsonb) AS skills
+        FROM candidates
+        ORDER BY created_at DESC
+        LIMIT 200
+      `
+      employees = await sql/* sql */`
+        SELECT name, role, pto_balance FROM employees ORDER BY name ASC LIMIT 200
+      `
+    } catch (dbErr) {
+      console.error("DB error in /api/ai/chat:", dbErr)
+      // Fall back to empty data if DB is not configured
+    }
 
-  const result = await streamText({
-    model: openai("gpt-4o"),
-    system: "You are an HR assistant. Use the provided data context to answer succinctly.",
-    prompt: `Context:
+    const cText = (candidates || []).map((c: any) => `- ${c.name} | score ${c.overall} | status ${c.status} | job ${c.job_title || c.applied_job_id} | skills ${(Array.isArray(c.skills) ? c.skills : []).join(", ")}`).join("\n")
+    const eText = (employees || []).map((e: any) => `- ${e.name} | role ${e.role} | PTO ${e.pto_balance}`).join("\n")
+
+    const modelName = process.env.OPENAI_MODEL || "gpt-5"
+
+    const result = await streamText({
+      model: openai(modelName),
+      system: "You are an HR assistant. Use the provided data context to answer succinctly.",
+      prompt: `Context:
 Candidates:
 ${cText || "(none)"}
 
@@ -36,6 +47,14 @@ ${eText || "(none)"}
 
 Question: ${userMessage}
 Answer based only on the context above.`,
-  })
-  return result.toAIStreamResponse()
+    })
+    return result.toAIStreamResponse()
+  } catch (err: any) {
+    const status = err?.status ?? 500
+    const message = err?.message || "Internal Server Error"
+    return new Response(JSON.stringify({ error: message }), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    })
+  }
 }

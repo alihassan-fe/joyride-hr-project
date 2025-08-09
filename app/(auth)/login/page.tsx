@@ -17,7 +17,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const search = useSearchParams()
   const router = useRouter()
-  const callbackUrl = search.get("callbackUrl") || "/applicants"
+  const callbackUrl = search.get("callbackUrl") || "/dashboard"
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -68,38 +68,28 @@ export default function LoginPage() {
             <Separator className="flex-1" />
             <span className="text-xs text-muted-foreground">or</span>
             <Separator className="flex-1" />
-          </div> */}
-          {/* SSO buttons (Google temporarily disabled to prevent open signups)
-              To re-enable, change showGoogle to true */}
-          {(() => {
-            const showGoogle = false
-            return (
-              <div className="grid gap-2">
-                {showGoogle && (
+          </div> 
+            <div className="grid gap-2">
                   <Button
                     variant="outline"
                     className="w-full bg-transparent"
-                    onClick={() => signIn("google", { callbackUrl: "/applicants" })}
+                    onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
                     disabled={loading !== null}
                   >
                     <img src="/google.svg" alt="" className="h-4 w-4 mr-2" />
                     {loading === "google" ? "Redirecting..." : "Continue with Google"}
                   </Button>
-                )}
-                {/* Microsoft can remain commented out if not configured
+                Microsoft can remain commented out if not configured
                 <Button
                   variant="outline"
                   className="w-full bg-transparent"
-                  onClick={() => signIn("azure-ad", { callbackUrl: "/applicants" })}
+                  onClick={() => signIn("azure-ad", { callbackUrl: "/dashboard" })}
                   disabled={loading !== null}
                 >
                   <img src="/microsoft.png" alt="" className="h-4 w-4 mr-2" />
                   {loading === "azure-ad" ? "Redirecting..." : "Continue with Microsoft"}
                 </Button>
-                */}
-              </div>
-            )
-          })()}
+              </div>    */}
         </CardContent>
       </Card>
     </div>

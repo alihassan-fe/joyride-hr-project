@@ -42,86 +42,11 @@ type Broadcast = {
 }
 
 // Change this URL to your actual n8n public webhook
-const WEBHOOK_URL = "https://example.com/webhook/candidates"
-
-// Fallback candidate data when webhook doesn't return data
-const sampleData: WebhookCandidate[] = [
-  {
-    id: 183,
-    name: "Sergej Miladinović",
-    email: "sergejmiladinovic00@gmail.com",
-    phone: "387 66 229 390",
-    cvLink: "https://drive.google.com/file/d/1AaRDBd6932qT13u_OjMa4GyEZN0imDbK/view?usp=drivesdk",
-    dispatch: 2,
-    operationsManager: 1,
-    strengths: [
-      "Good computer skills including Microsoft Office, AutoCAD...",
-      "Troubleshooting and technical support experience...",
-      "Fluent in English and native Serbian speaker.",
-    ],
-    weaknesses: ["No direct experience in freight dispatch...", "Lacks specific experience in load assignments..."],
-    notes: "Candidate does not have relevant industry experience...",
-    recommendation: "Remove",
-  },
-  {
-    id: 184,
-    name: "Ana Petrović",
-    email: "ana.petrovic@email.com",
-    phone: "387 65 123 456",
-    cvLink: "https://drive.google.com/file/d/example2",
-    dispatch: 4,
-    operationsManager: 5,
-    strengths: [
-      "5+ years experience in logistics",
-      "Strong communication skills",
-      "Proven track record in operations management",
-    ],
-    weaknesses: ["Limited experience with specific software tools", "May need training on company procedures"],
-    notes: "Strong candidate with relevant experience and good references.",
-    recommendation: "Consider",
-  },
-  {
-    id: 185,
-    name: "Marko Jovanović",
-    email: "marko.jovanovic@email.com",
-    phone: "387 64 987 654",
-    cvLink: "https://drive.google.com/file/d/example3",
-    dispatch: 5,
-    operationsManager: 4,
-    strengths: ["Excellent dispatch experience", "Strong problem-solving skills", "Great under pressure"],
-    weaknesses: ["Limited management experience", "Needs improvement in documentation"],
-    notes: "Excellent technical skills, would be great for dispatch role.",
-    recommendation: "Consider",
-  },
-]
-
-// Fallback broadcasts
-const sampleBroadcasts: Broadcast[] = [
-  {
-    id: 1,
-    title: "Office closed on Monday (Public Holiday)",
-    body: "Enjoy the long weekend!",
-    created_at: new Date().toISOString(),
-    created_by: "HR",
-  },
-  {
-    id: 2,
-    title: "Quarterly Town Hall Friday 3 PM",
-    body: "Join via Zoom link in calendar.",
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-    created_by: "Ops",
-  },
-  {
-    id: 3,
-    title: "Benefits enrollment window opens",
-    body: "See email for details.",
-    created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
-    created_by: "HR",
-  },
-]
+const WEBHOOK_URL = "https://oriormedia.app.n8n.cloud/webhook/candidates"
 
 export default function DashboardPage() {
   const [data, setData] = useState<WebhookCandidate[]>([])
+  console.log("data", data);
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>("")
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -139,11 +64,12 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`)
       const json = (await res.json()) as WebhookCandidate[] | { data: WebhookCandidate[] }
       const arr = Array.isArray(json) ? json : (json as any).data
+      console.log("arr", arr)
       if (!Array.isArray(arr)) throw new Error("Unexpected response shape")
-      setData(arr.length > 0 ? arr : sampleData)
+      setData(arr.length > 0 ? arr : [])
     } catch (e: any) {
       setError(e.message || "Failed to fetch candidates")
-      setData(sampleData)
+      setData([])
     } finally {
       setLoading(false)
     }
@@ -157,9 +83,9 @@ export default function DashboardPage() {
       const json = (await res.json()) as Broadcast[] | { data: Broadcast[] }
       const arr = Array.isArray(json) ? json : (json as any).data
       if (!Array.isArray(arr)) throw new Error("Unexpected broadcasts response shape")
-      setBroadcasts(arr.length > 0 ? arr : sampleBroadcasts)
+      setBroadcasts(arr.length > 0 ? arr : [])
     } catch {
-      setBroadcasts(sampleBroadcasts)
+      setBroadcasts([])
     } finally {
       setBroadcastsLoading(false)
     }
@@ -229,15 +155,20 @@ export default function DashboardPage() {
   }, [data])
 
   // New charts data
-  const groupedBarData = useMemo(
-    () =>
-      data.map((c) => ({
-        name: c.name,
-        dispatch: Number(c.dispatch ?? 0),
-        ops: Number(c.operationsManager ?? 0),
-      })),
-    [data],
-  )
+const groupedBarData = useMemo(() => {
+  return [...data]
+    .sort(
+      (a, b) =>
+        (Number(b.dispatch ?? 0) + Number(b.operationsManager ?? 0)) -
+        (Number(a.dispatch ?? 0) + Number(a.operationsManager ?? 0))
+    )
+    .slice(0, 5) // top 5 results
+    .map((c) => ({
+      name: c.name,
+      dispatch: Number(c.dispatch ?? 0),
+      ops: Number(c.operationsManager ?? 0),
+    }));
+}, [data]);
 
   const recommendationPieData = useMemo(() => {
     const consider = stats.consider
@@ -574,7 +505,7 @@ export default function DashboardPage() {
                       </TableRow>
                     ))}
                   {!loading &&
-                    data.map((c) => (
+                    data.slice(0, 8).map((c) => (
                       <TableRow key={c.id} className="hover:bg-neutral-50">
                         <TableCell className="font-medium min-w-[150px] whitespace-nowrap">{c.name}</TableCell>
                         <TableCell className="text-neutral-600 min-w-[200px] whitespace-nowrap">{c.email}</TableCell>

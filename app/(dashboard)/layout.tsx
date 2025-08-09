@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { AIChatFloating } from "@/components/ai-chat-floating"
 
 export default function DashboardLayout({
   children,
@@ -67,6 +68,7 @@ export default function DashboardLayout({
           {children}
         </main>
       </SidebarInset>
+      <AIChatFloating />
     </SidebarProvider>
   )
 }
