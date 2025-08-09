@@ -10,17 +10,43 @@ import {
 } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  
+  useEffect(() => {
+    if (status === "loading") return // Still loading
+    
+    if (!session) {
+      router.push("/login")
+      return
+    }
+  }, [session, status, router])
+  
+  // Show loading state while checking auth
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    )
+  }
+  
+  // Don't render dashboard if not authenticated
+  if (!session) {
+    return null
+  }
   
   return (
     <SidebarProvider defaultOpen={true}>
-      <AppSidebar user={session?.user} />
+      <AppSidebar user={session?.user as any} />
       <SidebarInset>
         <header
           className={cn(

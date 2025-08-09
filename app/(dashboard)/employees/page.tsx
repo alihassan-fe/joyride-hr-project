@@ -31,7 +31,8 @@ export default function EmployeesPage() {
       setLoading(true)
       const res = await fetch("/api/employees")
       const data = await res.json()
-      setEmployees(data)
+      console.log("🚀 ~ fetchEmployees ~ data:", data)
+      setEmployees(data?.data ?? [])
     } finally {
       setLoading(false)
     }
@@ -66,8 +67,8 @@ export default function EmployeesPage() {
         <CardHeader>
           <CardTitle>Employee Directory</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+        <CardContent>
+        <div className="border rounded-md overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -94,11 +95,11 @@ export default function EmployeesPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => (window.location.href = "/dashboard/calendar")}
+                          onClick={() => (window.location.href = "/calendar")}
                         >
                           View Schedule
                         </Button>
-                        <Button size="sm" onClick={() => (window.location.href = "/dashboard/calendar")}>
+                        <Button size="sm" onClick={() => (window.location.href = "/calendar")}>
                           Request PTO
                         </Button>
                       </div>

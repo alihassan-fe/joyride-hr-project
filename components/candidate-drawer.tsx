@@ -67,7 +67,7 @@ export function CandidateDrawer({
           </SheetTitle>
         </SheetHeader>
         {!candidate ? null : (
-          <div className="mt-4 space-y-6">
+          <div className="mt-4 space-y-6 py-4 px-5 overflow-auto">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-neutral-500">Status</span>
               <Badge variant="secondary">{candidate.status}</Badge>

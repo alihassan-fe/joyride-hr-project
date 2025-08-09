@@ -9,11 +9,10 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-
-const FullCalendar = dynamic(() => import("@fullcalendar/react"), { ssr: false }) as any
-const dayGridPlugin = dynamic(() => import("@fullcalendar/daygrid"), { ssr: false }) as any
-const timeGridPlugin = dynamic(() => import("@fullcalendar/timegrid"), { ssr: false }) as any
-const interactionPlugin = dynamic(() => import("@fullcalendar/interaction"), { ssr: false }) as any
+import FullCalendar from "@fullcalendar/react"
+import dayGridPlugin from "@fullcalendar/daygrid"
+import timeGridPlugin from "@fullcalendar/timegrid"
+import interactionPlugin from "@fullcalendar/interaction"
 
 type Draft = {
   title: string

@@ -31,11 +31,16 @@ const navItems = [
   { href: "/employees", label: "Employees", icon: Users },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/broadcasts", label: "Broadcasts", icon: Megaphone },
+]
+
+const adminNavItems = [
   { href: "/admin/users", label: "Admin Users", icon: UserPlus },
 ]
 
 export function AppSidebar({ user = { email: "user@example.com", role: "Authenticated" } }: Props) {
   const pathname = usePathname()
+  const isAdmin = user?.role === "Admin"
+  
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -68,6 +73,30 @@ export function AppSidebar({ user = { email: "user@example.com", role: "Authenti
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminNavItems.map((item) => {
+                  const Icon = item.icon
+                  const active = pathname === item.href || pathname.startsWith(item.href + "/")
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+                        <Link href={item.href}>
+                          <Icon />
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter>
         <div className="px-2 group-data-[collapsible=icon]:hidden">
