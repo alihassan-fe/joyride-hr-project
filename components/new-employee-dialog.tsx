@@ -52,7 +52,6 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
           email: email.trim().toLowerCase(),
           role,
           start_date: new Date(startDate).toISOString(),
-          pto_balance: Number.isFinite(pto) ? pto : 0,
         }),
       })
       if (!res.ok) {
@@ -123,16 +122,6 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
           <div className="grid gap-2">
             <Label htmlFor="start">Start Date</Label>
             <Input id="start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="pto">PTO Balance (days)</Label>
-            <Input
-              id="pto"
-              type="number"
-              min={0}
-              value={Number.isFinite(pto) ? pto : 0}
-              onChange={(e) => setPto(Number(e.target.value))}
-            />
           </div>
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={submitting}>

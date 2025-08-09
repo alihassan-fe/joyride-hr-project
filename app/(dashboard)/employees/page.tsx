@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,7 +15,6 @@ type Employee = {
   email: string
   role: string
   start_date: string
-  pto_balance: number
 }
 
 type Broadcast = { id: number; title: string; message: string; created_at: string }
@@ -85,7 +83,6 @@ export default function EmployeesPage() {
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Start</TableHead>
-                  <TableHead>PTO</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -98,16 +95,10 @@ export default function EmployeesPage() {
                     <TableCell className="whitespace-nowrap">
                       {e.start_date ? new Date(e.start_date).toLocaleDateString() : "-"}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <Badge variant="secondary">{e.pto_balance} days</Badge>
-                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={() => (window.location.href = "/calendar")}>
                           View Schedule
-                        </Button>
-                        <Button size="sm" onClick={() => (window.location.href = "/calendar")}>
-                          Request PTO
                         </Button>
                       </div>
                     </TableCell>
@@ -115,7 +106,7 @@ export default function EmployeesPage() {
                 ))}
                 {employees.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
                       {loading ? "Loading..." : "No employees found"}
                     </TableCell>
                   </TableRow>

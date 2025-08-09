@@ -141,7 +141,7 @@ export default function DashboardPage() {
     const candidates = data
     return {
       total: candidates.length,
-      consider: candidates.filter((c) => c.recommendation?.toLowerCase() === "consider").length,
+      consider: candidates.filter((c) => c.recommendation?.toLowerCase() === "call immediately").length,
       remove: candidates.filter((c) => c.recommendation?.toLowerCase() === "remove").length,
       avgDispatch:
         candidates.length > 0
@@ -620,7 +620,7 @@ function RecommendationBadge({ value }: { value?: string }) {
   if (v === "remove") {
     return <Badge variant="destructive">Remove</Badge>
   }
-  if (v === "consider") {
+  if (v === "call immediately") {
     return (
       <Badge className="bg-emerald-100 text-emerald-900" variant="secondary">
         Consider
