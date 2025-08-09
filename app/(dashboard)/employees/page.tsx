@@ -1,12 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import NewEmployeeDialog from "@/components/new-employee-dialog"
 
 type Employee = {
   id: string
@@ -20,6 +22,9 @@ type Employee = {
 type Broadcast = { id: number; title: string; message: string; created_at: string }
 
 export default function EmployeesPage() {
+  const { data: session } = useSession()
+  const isAdmin = (session?.user as any)?.role === "Admin"
+
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [title, setTitle] = useState("")
@@ -31,7 +36,6 @@ export default function EmployeesPage() {
       setLoading(true)
       const res = await fetch("/api/employees")
       const data = await res.json()
-      console.log("🚀 ~ fetchEmployees ~ data:", data)
       setEmployees(data?.data ?? [])
     } finally {
       setLoading(false)
@@ -45,6 +49,7 @@ export default function EmployeesPage() {
   useEffect(() => {
     fetchEmployees()
     fetchBroadcasts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const sendBroadcast = async () => {
@@ -64,11 +69,15 @@ export default function EmployeesPage() {
   return (
     <div className="grid gap-6">
       <Card className="shadow-xl rounded-2xl">
-        <CardHeader>
-          <CardTitle>Employee Directory</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Employee Directory</CardTitle>
+            <p className="text-sm text-muted-foreground">{"Manage your team and track PTO"}</p>
+          </div>
+          {isAdmin && <NewEmployeeDialog onCreated={fetchEmployees} />}
         </CardHeader>
         <CardContent>
-        <div className="border rounded-md overflow-hidden">
+          <div className="border rounded-md overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -86,17 +95,15 @@ export default function EmployeesPage() {
                     <TableCell className="whitespace-nowrap">{e.name}</TableCell>
                     <TableCell className="whitespace-nowrap">{e.email}</TableCell>
                     <TableCell className="whitespace-nowrap">{e.role}</TableCell>
-                    <TableCell className="whitespace-nowrap">{e.start_date}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {e.start_date ? new Date(e.start_date).toLocaleDateString() : "-"}
+                    </TableCell>
                     <TableCell className="whitespace-nowrap">
                       <Badge variant="secondary">{e.pto_balance} days</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => (window.location.href = "/calendar")}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => (window.location.href = "/calendar")}>
                           View Schedule
                         </Button>
                         <Button size="sm" onClick={() => (window.location.href = "/calendar")}>

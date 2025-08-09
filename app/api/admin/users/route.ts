@@ -1,53 +1,72 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { getSql } from "@/lib/sql"
+import { NextResponse } from "next/server"
+import { neon } from "@neondatabase/serverless"
 import { auth } from "@/lib/auth-next"
 
-const ALLOWED_ROLES = new Set(["Admin", "Manager", "Recruiter", "Viewer"])
+const sql = neon(process.env.DATABASE_URL as string)
 
-export async function POST(req: NextRequest) {
+function isAdmin(session: any) {
+  return session?.user && (session.user as any)?.role === "Admin"
+}
+
+export async function GET() {
   const session = await auth()
-  const role = (session?.user as any)?.role as string | undefined
+  if (!isAdmin(session)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+  try {
+    // Adjust column names if your schema differs
+    const rows = await sql<
+      { id: string; email: string; name: string | null; role: string; created_at: string | null }[]
+    >`select id::text, email, name, role, created_at from users order by created_at desc nulls last limit 200`
+    return NextResponse.json(rows)
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Failed to load users" }, { status: 500 })
+  }
+}
 
-  if (!session?.user || role !== "Admin") {
+type PostBody = { email?: string; name?: string; role?: string; password?: string }
+
+const ALLOWED_ROLES = new Set(["Admin", "Manager", "HR", "Employee", "Authenticated"])
+
+export async function POST(req: Request) {
+  const session = await auth()
+  if (!isAdmin(session)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const body = (await req.json().catch(() => null)) as {
-    email?: string
-    name?: string
-    role?: string
-    password?: string
-  } | null
+  const body = (await req.json()) as PostBody
+  const email = (body.email || "").trim().toLowerCase()
+  const name = (body.name || "").trim()
+  const role = (body.role || "").trim()
+  const password = (body.password || "").trim()
 
-  const email = body?.email?.trim().toLowerCase() || ""
-  const name = body?.name?.trim() || ""
-  const newRole = body?.role || "Viewer"
-  const password = body?.password || ""
-
-  if (!email || !password || password.length < 8) {
-    return NextResponse.json(
-      { error: "Invalid payload. Email and password are required. Password must be at least 8 chars." },
-      { status: 400 },
-    )
+  if (!email || !password || !role) {
+    return NextResponse.json({ error: "Missing email, password, or role" }, { status: 400 })
   }
-  if (!ALLOWED_ROLES.has(newRole)) {
+  if (!ALLOWED_ROLES.has(role)) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 })
   }
+  // Naive email check
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json({ error: "Invalid email" }, { status: 400 })
+  }
 
-  const sql = getSql()
   try {
-    const [row] = await sql /* sql */`
-      INSERT INTO users (email, name, role, password_hash)
-      VALUES (${email}, ${name}, ${newRole}, crypt(${password}, gen_salt('bf')))
-      RETURNING id, email, name, role, created_at
-    `
-    return NextResponse.json({ data: row })
-  } catch (err: any) {
-    // Unique violation
-    if (err?.message?.includes("duplicate key") || err?.code === "23505") {
-      return NextResponse.json({ error: "Email already exists" }, { status: 409 })
+    const rows = await sql<
+      { id: string; email: string; name: string | null; role: string; created_at: string | null }[]
+    >`insert into users (email, name, role, password_hash)
+      values (${email}, ${name || null}, ${role}, crypt(${password}, gen_salt('bf')))
+      on conflict (email) do nothing
+      returning id::text, email, name, role, created_at`
+    if (rows.length === 0) {
+      return NextResponse.json({ error: "User already exists" }, { status: 409 })
     }
-    console.error("Create user error:", err)
-    return NextResponse.json({ error: "Internal error" }, { status: 500 })
+    return NextResponse.json(rows[0], { status: 201 })
+  } catch (e: any) {
+    // 23505 unique_violation
+    if (e?.code === "23505") {
+      return NextResponse.json({ error: "User already exists" }, { status: 409 })
+    }
+    return NextResponse.json({ error: e?.message || "Failed to create user" }, { status: 500 })
   }
 }

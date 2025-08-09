@@ -189,7 +189,7 @@ export default function ApplicantsPage() {
                     </TableRow>
                   ))}
                 {!loading &&
-                  data.map((c) => (
+                  paginatedData.map((c) => (
                     <TableRow key={c.id} className="hover:bg-neutral-50">
                       <TableCell className="font-medium min-w-[150px] whitespace-nowrap">{c.name}</TableCell>
                       <TableCell className="text-neutral-600 min-w-[200px] whitespace-nowrap">{c.email}</TableCell>

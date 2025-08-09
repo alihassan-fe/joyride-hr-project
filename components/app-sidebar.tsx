@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Bot, Calendar, FileText, LayoutDashboard, LogOut, Megaphone, UserPlus, Users } from "lucide-react"
+import { Bot, Calendar, FileText, LayoutDashboard, LogOut, Megaphone, UserPlus, Users, User } from "lucide-react"
 import { signOut } from "next-auth/react"
 
 type Props = {
@@ -27,20 +27,19 @@ type Props = {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/profile", label: "Profile", icon: User },
   { href: "/applicants", label: "Applicants", icon: FileText },
   { href: "/employees", label: "Employees", icon: Users },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/broadcasts", label: "Broadcasts", icon: Megaphone },
 ]
 
-const adminNavItems = [
-  { href: "/admin/users", label: "Admin Users", icon: UserPlus },
-]
+const adminNavItems = [{ href: "/admin/users", label: "Admin Users", icon: UserPlus }]
 
 export function AppSidebar({ user = { email: "user@example.com", role: "Authenticated" } }: Props) {
   const pathname = usePathname()
   const isAdmin = user?.role === "Admin"
-  
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -73,7 +72,7 @@ export function AppSidebar({ user = { email: "user@example.com", role: "Authenti
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        
+
         {isAdmin && (
           <SidebarGroup>
             <SidebarGroupLabel>Administration</SidebarGroupLabel>
@@ -97,6 +96,7 @@ export function AppSidebar({ user = { email: "user@example.com", role: "Authenti
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+        
       </SidebarContent>
       <SidebarFooter>
         <div className="px-2 group-data-[collapsible=icon]:hidden">

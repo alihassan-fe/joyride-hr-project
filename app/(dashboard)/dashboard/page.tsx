@@ -257,7 +257,7 @@ const groupedBarData = useMemo(() => {
         {/* Grouped Bar Chart: Dispatch vs Ops Manager */}
         <Card className="rounded-2xl shadow-md">
           <CardHeader>
-            <CardTitle className="text-base">Scores by Candidate (Bar)</CardTitle>
+            <CardTitle className="text-base">Scores by Candidate</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -327,7 +327,7 @@ const groupedBarData = useMemo(() => {
       {/* Existing Score Comparison Line Chart (ECharts) */}
       <Card className="rounded-2xl shadow-md">
         <CardHeader>
-          <CardTitle className="text-base">Score Comparison (Line)</CardTitle>
+          <CardTitle className="text-base">Score Comparison</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
