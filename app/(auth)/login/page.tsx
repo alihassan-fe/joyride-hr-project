@@ -17,7 +17,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const search = useSearchParams()
   const router = useRouter()
-  const callbackUrl = search.get("callbackUrl") || "/dashboard/applicants"
+  const callbackUrl = search.get("callbackUrl") || "/applicants"
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -35,8 +35,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-[100dvh] flex items-center justify-center bg-neutral-50 p-4">
       <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="flex items-center gap-3">
-          <img src="/placeholder-logo.svg" alt="Logo" className="h-8 w-auto" />
+        <CardHeader className="flex flex-col items-center gap-3">
+        <img src="/rsz_jr_color_long.png" alt="Company logo" className="h-6 w-auto" />
           <CardTitle className="text-xl">Sign in to Joyride HR</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -64,11 +64,11 @@ export default function LoginPage() {
               {loading === "credentials" ? "Signing in..." : "Sign in"}
             </Button>
           </form>
-          <div className="flex items-center gap-2">
+          {/* <div className="flex items-center gap-2">
             <Separator className="flex-1" />
             <span className="text-xs text-muted-foreground">or</span>
             <Separator className="flex-1" />
-          </div>
+          </div> */}
           {/* SSO buttons (Google temporarily disabled to prevent open signups)
               To re-enable, change showGoogle to true */}
           {(() => {

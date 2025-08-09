@@ -27,11 +27,11 @@ type Props = {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/applicants", label: "Applicants", icon: FileText },
-  { href: "/dashboard/employees", label: "Employees", icon: Users },
-  { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
-  { href: "/dashboard/broadcasts", label: "Broadcasts", icon: Megaphone },
-  { href: "/dashboard/admin/users", label: "Admin Users", icon: UserPlus },
+  { href: "/applicants", label: "Applicants", icon: FileText },
+  { href: "/employees", label: "Employees", icon: Users },
+  { href: "/calendar", label: "Calendar", icon: Calendar },
+  { href: "/broadcasts", label: "Broadcasts", icon: Megaphone },
+  { href: "/admin/users", label: "Admin Users", icon: UserPlus },
 ]
 
 export function AppSidebar({ user = { email: "user@example.com", role: "Authenticated" } }: Props) {
@@ -41,15 +41,14 @@ export function AppSidebar({ user = { email: "user@example.com", role: "Authenti
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <img src="/placeholder-logo.svg" alt="Company logo" className="h-6 w-auto" />
-            <span className="text-sm font-semibold group-data-[collapsible=icon]:hidden">Joyride HR</span>
+            <img src="/rsz_jr_color_long.png" alt="Company logo" className="h-6 w-auto" />
           </Link>
         </div>
       </SidebarHeader>
       <SidebarSeparator />
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {

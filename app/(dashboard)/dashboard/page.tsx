@@ -182,43 +182,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="shadow-xl rounded-2xl">
-            <CardHeader>
-              <CardTitle>Applicants</CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Manage candidates and reviews.</p>
-              <Button variant="outline" asChild>
-                <Link href="/dashboard/applicants">Open</Link>
-              </Button>
-            </CardContent>
-          </Card>
-          <Card className="shadow-xl rounded-2xl">
-            <CardHeader>
-              <CardTitle>Employees</CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Directory and broadcasts.</p>
-              <Button variant="outline" asChild>
-                <Link href="/dashboard/employees">Open</Link>
-              </Button>
-            </CardContent>
-          </Card>
-          <Card className="shadow-xl rounded-2xl">
-            <CardHeader>
-              <CardTitle>Calendar</CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">PTO, holidays, interviews.</p>
-              <Button variant="outline" asChild>
-                <Link href="/dashboard/calendar">Open</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
 
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
@@ -310,9 +273,8 @@ export default function DashboardPage() {
           <CardTitle className="text-base">Candidates</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="border rounded-md">
-            <div className="overflow-x-auto relative">
-              <Table className="w-[1200px] w-full">
+        <div className="border rounded-md overflow-x-auto w-full max-w-[1190px]">
+              <Table className="w-full">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="min-w-[150px] whitespace-nowrap">Name</TableHead>
@@ -448,7 +410,6 @@ export default function DashboardPage() {
                   )}
                 </TableBody>
               </Table>
-            </div>
           </div>
         </CardContent>
       </Card>
