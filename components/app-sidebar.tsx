@@ -10,19 +10,15 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
-  SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarProvider,
   SidebarRail,
   SidebarSeparator,
-  SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { Bot, Calendar, FileText, LayoutDashboard, LogOut, Megaphone, Users } from "lucide-react"
+import { Bot, Calendar, FileText, LayoutDashboard, LogOut, Megaphone, UserPlus, Users } from "lucide-react"
 import { signOut } from "next-auth/react"
 
 type Props = {
@@ -35,17 +31,18 @@ const navItems = [
   { href: "/dashboard/employees", label: "Employees", icon: Users },
   { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
   { href: "/dashboard/broadcasts", label: "Broadcasts", icon: Megaphone },
+  { href: "/dashboard/admin/users", label: "Admin Users", icon: UserPlus },
 ]
 
 export function AppSidebar({ user = { email: "user@example.com", role: "Authenticated" } }: Props) {
   const pathname = usePathname()
   return (
-    <Sidebar collapsible="icon" className="">
+    <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1">
           <Link href="/dashboard" className="flex items-center gap-2">
             <img src="/placeholder-logo.svg" alt="Company logo" className="h-6 w-auto" />
-            <span className="text-sm font-semibold">Joyride HR</span>
+            <span className="text-sm font-semibold group-data-[collapsible=icon]:hidden">Joyride HR</span>
           </Link>
         </div>
       </SidebarHeader>
@@ -74,7 +71,7 @@ export function AppSidebar({ user = { email: "user@example.com", role: "Authenti
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="px-2 pb-1">
+        <div className="px-2 group-data-[collapsible=icon]:hidden">
           <div className="text-xs text-muted-foreground leading-tight">
             <div className="truncate">{user.email}</div>
             <div className="flex items-center gap-1">
@@ -85,7 +82,7 @@ export function AppSidebar({ user = { email: "user@example.com", role: "Authenti
             </div>
           </div>
         </div>
-        <div className="px-2">
+        <div className="px-2 group-data-[collapsible=icon]:hidden">
           <Button
             variant="outline"
             className="w-full justify-start bg-transparent"
@@ -113,6 +110,3 @@ export function AppSidebar({ user = { email: "user@example.com", role: "Authenti
     </Sidebar>
   )
 }
-
-// Re-export helpers so layout can import from here
-export { SidebarInset, SidebarProvider, SidebarTrigger, Separator }

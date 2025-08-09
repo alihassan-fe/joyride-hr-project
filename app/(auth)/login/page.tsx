@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const search = useSearchParams()
   const router = useRouter()
@@ -21,10 +21,10 @@ export default function LoginPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    setLoading(true)
+    setLoading("credentials")
     setError(null)
     const res = await signIn("credentials", { email, password, redirect: false, callbackUrl })
-    setLoading(false)
+    setLoading(null)
     if (res?.error) {
       setError("Invalid credentials")
       return
@@ -60,8 +60,8 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
+            <Button type="submit" className="w-full" disabled={loading !== null}>
+              {loading === "credentials" ? "Signing in..." : "Sign in"}
             </Button>
           </form>
           <div className="flex items-center gap-2">
@@ -69,24 +69,37 @@ export default function LoginPage() {
             <span className="text-xs text-muted-foreground">or</span>
             <Separator className="flex-1" />
           </div>
-          <div className="grid gap-2">
-            <Button
-              variant="outline"
-              className="w-full justify-center gap-2 bg-transparent"
-              onClick={() => signIn("google", { callbackUrl })}
-            >
-              <img src="/google.svg" alt="Google" className="h-4 w-4" />
-              Continue with Google
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-center gap-2 bg-transparent"
-              onClick={() => signIn("azure-ad", { callbackUrl })}
-            >
-              <img src="/microsoft.png" alt="Microsoft" className="h-4 w-4" />
-              Continue with Microsoft
-            </Button>
-          </div>
+          {/* SSO buttons (Google temporarily disabled to prevent open signups)
+              To re-enable, change showGoogle to true */}
+          {(() => {
+            const showGoogle = false
+            return (
+              <div className="grid gap-2">
+                {showGoogle && (
+                  <Button
+                    variant="outline"
+                    className="w-full bg-transparent"
+                    onClick={() => signIn("google", { callbackUrl: "/applicants" })}
+                    disabled={loading !== null}
+                  >
+                    <img src="/google.svg" alt="" className="h-4 w-4 mr-2" />
+                    {loading === "google" ? "Redirecting..." : "Continue with Google"}
+                  </Button>
+                )}
+                {/* Microsoft can remain commented out if not configured
+                <Button
+                  variant="outline"
+                  className="w-full bg-transparent"
+                  onClick={() => signIn("azure-ad", { callbackUrl: "/applicants" })}
+                  disabled={loading !== null}
+                >
+                  <img src="/microsoft.png" alt="" className="h-4 w-4 mr-2" />
+                  {loading === "azure-ad" ? "Redirecting..." : "Continue with Microsoft"}
+                </Button>
+                */}
+              </div>
+            )
+          })()}
         </CardContent>
       </Card>
     </div>
