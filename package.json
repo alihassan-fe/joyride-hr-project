@@ -11,6 +11,11 @@
   "dependencies": {
     "@ai-sdk/openai": "latest",
     "@auth/core": "latest",
+    "@fullcalendar/core": "latest",
+    "@fullcalendar/daygrid": "latest",
+    "@fullcalendar/interaction": "latest",
+    "@fullcalendar/react": "latest",
+    "@fullcalendar/timegrid": "latest",
     "@hookform/resolvers": "^3.10.0",
     "@neondatabase/serverless": "latest",
     "@radix-ui/react-accordion": "1.2.2",
