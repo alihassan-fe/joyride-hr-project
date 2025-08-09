@@ -1,30 +1,32 @@
-import type React from "react"
-import { auth } from "@/lib/auth-next"
-import { redirect } from "next/navigation"
-import { AppSidebar, SidebarInset, SidebarProvider, SidebarTrigger, Separator } from "@/components/app-sidebar"
-import { AIChatFloating } from "@/components/ai-chat-floating"
+"use client"
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth()
-  if (!session?.user) {
-    redirect("/login")
-  }
+import type * as React from "react"
+import { ModeToggle } from "@/components/mode-toggle"
+import { cn } from "@/lib/utils"
 
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <SidebarProvider>
-      <AppSidebar user={{ email: session.user.email || "", role: (session.user as any).role || "Authenticated" }} />
-      <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <div className="flex items-center gap-2">
-            <img src="/placeholder-logo.svg" alt="Company logo" className="h-6 w-auto" />
-            <span className="text-sm text-neutral-500">Dashboard</span>
-          </div>
-        </header>
-        <main className="p-4 md:p-6">{children}</main>
-      </SidebarInset>
-      <AIChatFloating />
-    </SidebarProvider>
+    <div className="min-h-screen bg-background text-foreground">
+      <header
+        className={cn(
+          "sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b bg-background/80 px-4 backdrop-blur",
+          "supports-[backdrop-filter]:bg-background/60",
+        )}
+        role="banner"
+      >
+        <div className="flex items-center gap-2">
+          {/* Left area: space for breadcrumbs / sidebar trigger if you have one */}
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Right actions */}
+          <ModeToggle />
+        </div>
+      </header>
+      <main className="min-h-[calc(100vh-3.5rem)]">{children}</main>
+    </div>
   )
 }
