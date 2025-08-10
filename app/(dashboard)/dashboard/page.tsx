@@ -208,47 +208,47 @@ const groupedBarData = useMemo(() => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="rounded-2xl shadow-md">
-          <CardHeader className="pb-2">
+          <CardHeader>
             <CardTitle className="text-sm font-medium text-neutral-600">Total Candidates</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loading ? "..." : stats.total}</div>
+            <div className="text-4xl font-bold">{loading ? "..." : stats.total}</div>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl shadow-md">
-          <CardHeader className="pb-2">
+          <CardHeader>
             <CardTitle className="text-sm font-medium text-neutral-600">Consider</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">{loading ? "..." : stats.consider}</div>
+            <div className="text-4xl font-bold text-emerald-600">{loading ? "..." : stats.consider}</div>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl shadow-md">
-          <CardHeader className="pb-2">
+          <CardHeader>
             <CardTitle className="text-sm font-medium text-neutral-600">Remove</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{loading ? "..." : stats.remove}</div>
+            <div className="text-4xl font-bold text-red-600">{loading ? "..." : stats.remove}</div>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl shadow-md">
-          <CardHeader className="pb-2">
+          <CardHeader>
             <CardTitle className="text-sm font-medium text-neutral-600">Avg Dispatch</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{loading ? "..." : stats.avgDispatch}</div>
+            <div className="text-4xl font-bold text-amber-600">{loading ? "..." : stats.avgDispatch}</div>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl shadow-md">
-          <CardHeader className="pb-2">
+          <CardHeader>
             <CardTitle className="text-sm font-medium text-neutral-600">Avg Ops Manager</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">{loading ? "..." : stats.avgOpsManager}</div>
+            <div className="text-4xl font-bold text-emerald-600">{loading ? "..." : stats.avgOpsManager}</div>
           </CardContent>
         </Card>
       </div>

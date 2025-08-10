@@ -66,11 +66,10 @@ export function CandidateDrawer({
           </SheetTitle>
         </SheetHeader>
         {!candidate ? null : (
-          <div className="mt-4 space-y-6 py-4 px-5 overflow-auto">
+          <div className=" space-y-6 px-5 overflow-auto ">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-neutral-500">Status</span>
               <Badge variant="secondary">{candidate.recommendation}</Badge>
-              <span className="text-sm text-neutral-500">Score</span>
             </div>
 
             <Separator />
@@ -83,11 +82,12 @@ export function CandidateDrawer({
 
             <div className="space-y-2">
               <div className="text-sm text-neutral-500">Strengths</div>
-              <div className="flex flex-wrap gap-2">
+              <ul className="flex flex-wrap gap-2">
                 {(candidate.strengths || []).map((s, i) => (
-                  <Badge key={i} className="bg-neutral-100 text-neutral-800" variant="secondary">{s}</Badge>
+                  <li key={i} className="text-sm">{s}</li>
                 ))}
-              </div>
+              </ul>
+              
             </div>
 
             <div className="space-y-2">
@@ -99,14 +99,14 @@ export function CandidateDrawer({
               </ul>
             </div>
 
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>
               <Textarea id="notes" placeholder="Add notes..." value={notes} onChange={(e) => setNotes(e.target.value)} />
               <div className="flex gap-2">
                 <Button onClick={saveNotes} disabled={saving}>Save notes</Button>
                 <Button variant="outline" onClick={onClose}><X className="h-4 w-4 mr-2" />Close</Button>
               </div>
-            </div>
+            </div> */}
 
             <Separator />
 
@@ -118,8 +118,8 @@ export function CandidateDrawer({
                     key={s}
                     variant={s === "Remove" ? "destructive" : "secondary"}
                     className={cn(s !== "Remove" ? "bg-neutral-100 text-neutral-900 hover:bg-neutral-200" : "")}
-                    onClick={() => updateStatus(s)}
-                    disabled={saving}
+                    // onClick={() => updateStatus(s)}
+                    // disabled={saving}
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     {s}
@@ -131,7 +131,7 @@ export function CandidateDrawer({
                   href={candidate.cvLink}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center text-sm text-neutral-700 hover:underline"
+                  className="inline-flex items-center text-sm text-neutral-700 hover:underline my-4"
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   View original CV
