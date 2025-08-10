@@ -11,7 +11,6 @@ import type { Candidate, CandidateStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { CheckCircle2, FileText, User, X } from 'lucide-react'
 
-
 type Props = {
   candidate?: Candidate | null
   onClose?: () => void
