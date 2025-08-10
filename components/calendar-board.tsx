@@ -131,15 +131,33 @@ export function CalendarBoard() {
     }
   }, [draft, fetchEvents])
 
-  const handleEventClick = useCallback(
-    async (info: any) => {
-      const confirmDelete = window.confirm(`Delete "${info.event.title}"?`)
-      if (!confirmDelete) return
-      const res = await fetch(`/api/calendar/events?id=${info.event.id}`, { method: "DELETE" })
-      if (res.ok) fetchEvents()
-    },
-    [fetchEvents],
-  )
+const handleEventClick = useCallback(
+  (info: any) => {
+    const event = info.event
+    setDraft({
+      title: event.title,
+      type: event.extendedProps.type,
+      start: event.start?.toISOString() || "",
+      end: event.end?.toISOString() || "",
+      allDay: event.allDay,
+    })
+    setOpen(true)
+  },
+  []
+)
+
+// Add this delete function inside the component:
+const handleDelete = useCallback(async () => {
+  if (!draft) return
+  const confirmDelete = window.confirm(`Delete "${draft.title}"?`)
+  if (!confirmDelete) return
+  const res = await fetch(`/api/calendar/events?id=${draft.title}`, { method: "DELETE" })
+  if (res.ok) {
+    setOpen(false)
+    setDraft(null)
+    fetchEvents()
+  }
+}, [draft, fetchEvents])
 
   const headerToolbar = useMemo(
     () => ({ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay" }),
@@ -180,43 +198,46 @@ export function CalendarBoard() {
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Event</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label>Title</Label>
-              <Input
-                value={draft?.title || ""}
-                onChange={(e) => setDraft((d) => d && { ...d, title: e.target.value })}
-                placeholder="e.g., PTO - John Doe"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select value={draft?.type} onValueChange={(v: any) => setDraft((d) => d && { ...d, type: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pto">PTO</SelectItem>
-                  <SelectItem value="holiday">Public Holiday</SelectItem>
-                  <SelectItem value="interview">Interview</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {draft?.allDay ? "All-day event" : `From ${draft?.start} to ${draft?.end}`}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreate}>Create</Button>
-          </DialogFooter>
-        </DialogContent>
+       <DialogContent>
+  <DialogHeader>
+    <DialogTitle>Event Details</DialogTitle>
+  </DialogHeader>
+  <div className="space-y-3">
+    <div className="space-y-2">
+      <Label>Title</Label>
+      <Input
+        value={draft?.title || ""}
+        onChange={(e) => setDraft((d) => d && { ...d, title: e.target.value })}
+        placeholder="Event Title"
+      />
+    </div>
+    <div className="space-y-2">
+      <Label>Type</Label>
+      <Select value={draft?.type} onValueChange={(v: any) => setDraft((d) => d && { ...d, type: v })}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select type" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="pto">PTO</SelectItem>
+          <SelectItem value="holiday">Public Holiday</SelectItem>
+          <SelectItem value="interview">Interview</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+    <div className="text-xs text-muted-foreground">
+      {draft?.allDay ? "All-day event" : `From ${draft?.start} to ${draft?.end}`}
+    </div>
+  </div>
+  <DialogFooter>
+    <Button variant="destructive" onClick={handleDelete}>
+      Delete
+    </Button>
+    <Button variant="ghost" onClick={() => setOpen(false)}>
+      Close
+    </Button>
+    <Button onClick={handleCreate}>Create</Button>
+  </DialogFooter>
+</DialogContent>
       </Dialog>
     </Card>
   )
