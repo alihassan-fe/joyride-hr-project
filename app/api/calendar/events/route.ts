@@ -10,19 +10,23 @@ export async function GET(req: NextRequest) {
     let rows
     if (start && end) {
       rows = await sql`
-        SELECT id, title, type, to_char(start_time AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as start_time,
-               to_char(end_time AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as end_time,
-               all_day, created_by
+        SELECT id, title, type,
+               to_char(start_time AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as start_time,
+               to_char(end_time   AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as end_time,
+               all_day, created_by,
+               description, location, COALESCE(meta, '{}'::jsonb) AS meta
         FROM calendar_events
-        WHERE start_time <= ${end}::timestamptz
-          AND end_time >= ${start}::timestamptz
+        WHERE start_time <= ${start}::timestamptz
+          AND end_time   >= ${end}::timestamptz
         ORDER BY start_time ASC
       `
     } else {
       rows = await sql`
-        SELECT id, title, type, to_char(start_time AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as start_time,
-               to_char(end_time AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as end_time,
-               all_day, created_by
+        SELECT id, title, type,
+               to_char(start_time AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as start_time,
+               to_char(end_time   AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as end_time,
+               all_day, created_by,
+               description, location, COALESCE(meta, '{}'::jsonb) AS meta
         FROM calendar_events
         ORDER BY start_time ASC
         LIMIT 500
@@ -38,14 +42,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { title, type, start_time, end_time, all_day = false } = body
+    const { title, type, start_time, end_time, all_day = false, description, location, meta } = body
     const rows = await sql`
-      INSERT INTO calendar_events (title, type, start_time, end_time, all_day)
-      VALUES (${title}, ${type}, ${start_time}, ${end_time}, ${all_day})
+      INSERT INTO calendar_events (title, type, start_time, end_time, all_day, description, location, meta)
+      VALUES (${title}, ${type}, ${start_time}::timestamptz, ${end_time}::timestamptz, ${all_day}, ${description}, ${location}, ${meta ?? {}})
       RETURNING id, title, type,
         to_char(start_time AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') AS start_time,
-        to_char(end_time AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') AS end_time,
-        all_day, created_by
+        to_char(end_time   AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') AS end_time,
+        all_day, created_by, description, location, COALESCE(meta, '{}'::jsonb) AS meta
     `
     return NextResponse.json(rows[0], { status: 201 })
   } catch (e: any) {
@@ -57,19 +61,22 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json()
-    const { id, title, type, start_time, end_time, all_day } = body
+    const { id, title, type, start_time, end_time, all_day, description, location, meta } = body
     const rows = await sql`
       UPDATE calendar_events
-      SET title = COALESCE(${title}, title),
-          type = COALESCE(${type}, type),
+      SET title      = COALESCE(${title}, title),
+          type       = COALESCE(${type}, type),
           start_time = COALESCE(${start_time}::timestamptz, start_time),
-          end_time = COALESCE(${end_time}::timestamptz, end_time),
-          all_day = COALESCE(${all_day}, all_day)
+          end_time   = COALESCE(${end_time}::timestamptz, end_time),
+          all_day    = COALESCE(${all_day}, all_day),
+          description= COALESCE(${description}, description),
+          location   = COALESCE(${location}, location),
+          meta       = COALESCE(${meta}, meta)
       WHERE id = ${id}
       RETURNING id, title, type,
         to_char(start_time AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') AS start_time,
-        to_char(end_time AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') AS end_time,
-        all_day, created_by
+        to_char(end_time   AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') AS end_time,
+        all_day, created_by, description, location, COALESCE(meta, '{}'::jsonb) AS meta
     `
     if (!rows[0]) return NextResponse.json({ error: "Not found" }, { status: 404 })
     return NextResponse.json(rows[0], { status: 200 })
