@@ -1,4 +1,4 @@
-export type CandidateStatus = "New" | "Reviewed" | "Shortlisted" | "Interview" | "Hired" | "Rejected"
+export type CandidateStatus = "Call Immediatley" | "Remove" | "Shortlist"
 
 export type Job = {
   id: string
@@ -8,19 +8,17 @@ export type Job = {
 }
 
 export type Candidate = {
-  id: string
+id: number
   name: string
   email: string
   phone: string
-  cv_url?: string
-  status: CandidateStatus
-  scores?: { overall?: number; [k: string]: number | undefined }
-  applied_job_id?: string
-  job_title?: string
-  skills?: string[]
-  work_history?: string[]
+  cvLink?: string
+  dispatch?: number
+  operationsManager?: number
+  strengths?: string[]
+  weaknesses?: string[]
   notes?: string
-  created_at?: string
+  recommendation?: string // 'Remove' | 'Consider' | undefined
 }
 
 export type Employee = {

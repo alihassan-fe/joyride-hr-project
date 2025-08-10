@@ -21,40 +21,51 @@ export function ManualUpload({ onAdded = () => {} }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const WEBHOOK_URL = `${process.env.NEXT_PUBLIC_WEBHOOK_DOMAIN}/webhook/manual-cv-upload`
 
   useEffect(() => {
     fetch("/api/jobs").then(r => r.json()).then(j => setJobs(j.data || []))
   }, [])
 
-  async function handleUpload() {
-    if (!file || !jobId) return
-    setUploading(true)
-    const form = new FormData()
-    form.append("file", file)
-    form.append("applied_job_id", jobId)
-    const res = await fetch("/api/parse-cv", { method: "POST", body: form })
-    const parsed = await res.json()
+async function handleUpload() {
+  if (!file || !jobId) return;
+  setUploading(true);
+
+  const form = new FormData();
+  form.append("file", file);
+  form.append("applied_job_id", jobId);
+
+  try {
+    const res = await fetch(
+      WEBHOOK_URL,
+      {
+        method: "POST",
+        body: form,
+      }
+    );
+
     if (!res.ok) {
-      alert(parsed.error || "Parse failed")
-      setUploading(false)
-      return
+      const err = await res.text();
+      alert(`Upload failed: ${err}`);
+      setUploading(false);
+      return;
     }
-    const createRes = await fetch("/api/candidates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(parsed.data),
-    })
-    if (createRes.ok) {
-      setOpen(false)
-      setFile(null)
-      setJobId("")
-      onAdded()
-    } else {
-      const j = await createRes.json()
-      alert(j.error || "Failed to create candidate")
-    }
-    setUploading(false)
+
+    // n8n can return success JSON or text
+    const result = await res.json().catch(() => ({}));
+    console.log("n8n response", result);
+
+    setOpen(false);
+    setFile(null);
+    setJobId("");
+    onAdded(); // refresh UI
+  } catch (error) {
+    console.error(error);
+    alert("Something went wrong while uploading");
+  } finally {
+    setUploading(false);
   }
+}
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

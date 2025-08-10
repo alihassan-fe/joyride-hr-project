@@ -27,11 +27,11 @@ type Props = {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/profile", label: "Profile", icon: User },
   { href: "/applicants", label: "Applicants", icon: FileText },
   { href: "/employees", label: "Employees", icon: Users },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/broadcasts", label: "Broadcasts", icon: Megaphone },
+  { href: "/profile", label: "Profile", icon: User },
 ]
 
 const adminNavItems = [{ href: "/admin/users", label: "Admin Users", icon: UserPlus }]

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ModeToggle } from "@/components/mode-toggle"
 import { signOut } from "next-auth/react"
+import {LogOut} from "lucide-react"
+import { SignOutButton } from "@/components/SignOutButton"
 
 function initials(name?: string | null) {
   if (!name) return "U"
@@ -82,7 +84,7 @@ export default async function ProfilePage() {
             <CardTitle className="text-base">Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-
+  <SignOutButton />
           </CardContent>
         </Card>
       </div>

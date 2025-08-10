@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -11,29 +10,28 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { ExternalLink, RefreshCw, FileText, Info, Upload } from "lucide-react"
 import { ManualUpload } from "@/components/manual-upload"
 import { Input } from "@/components/ui/input" 
+import {CandidateDrawer} from "@/components/candidate-drawer"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Candidate } from "@/lib/types"
 
-// Match the data structure coming from the webhook
-export type WebhookCandidate = {
-  id: number
-  name: string
-  email: string
-  phone: string
-  cvLink?: string
-  dispatch?: number
-  operationsManager?: number
-  strengths?: string[]
-  weaknesses?: string[]
-  notes?: string
-  recommendation?: string // 'Remove' | 'Consider' | undefined
-}
 
 // Use the same webhook as the Dashboard
-const WEBHOOK_URL = "https://oriormedia.app.n8n.cloud/webhook/candidates"
+const WEBHOOK_URL = `${process.env.NEXT_PUBLIC_WEBHOOK_DOMAIN}/webhook/candidates`
 
 export default function ApplicantsPage() {
-  const [data, setData] = useState<WebhookCandidate[]>([])
+  const [data, setData] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>("")
+  const [recommendationFilter, setRecommendationFilter] = useState<string>("all")
+  const [selected, setSelected] = useState<Candidate | null>(null)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogTitle, setDialogTitle] = useState("")
@@ -49,7 +47,7 @@ export default function ApplicantsPage() {
     try {
       const res = await fetch(WEBHOOK_URL, { cache: "no-store" })
       if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`)
-      const json = (await res.json()) as WebhookCandidate[] | { data: WebhookCandidate[] }
+      const json = (await res.json()) as Candidate[] | { data: Candidate[] }
       const arr = Array.isArray(json) ? json : (json as any).data
       if (!Array.isArray(arr)) throw new Error("Unexpected response shape")
       setData(arr.length > 0 ? arr : [])
@@ -65,15 +63,21 @@ export default function ApplicantsPage() {
     fetchData()
   }, [])
 
-  // Filter applicants by search
-  const filteredData = data.filter(
-    (c) =>
+  const filteredData = data.filter((c) => {
+    const searchMatch =
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.email.toLowerCase().includes(search.toLowerCase()) ||
       c.phone.toLowerCase().includes(search.toLowerCase())
-  )
 
-  // Pagination logic
+    if (!searchMatch) return false
+
+    if (recommendationFilter !== "all") {
+      if ((c.recommendation || "").toLowerCase() !== recommendationFilter) return false
+    }
+
+    return true
+  })
+
   const totalPages = Math.ceil(filteredData.length / PAGE_SIZE)
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
@@ -115,7 +119,7 @@ export default function ApplicantsPage() {
       )}
 
       {/* Search input */}
-      <div className="max-w-sm">
+      <div className="w-full grid grid-cols-3 gap-5">
         <Input
           placeholder="Search by name, email, or phone..."
           value={search}
@@ -124,6 +128,26 @@ export default function ApplicantsPage() {
             setPage(1) // Reset to first page on search
           }}
         />
+     <Select
+      value={recommendationFilter}
+      onValueChange={(value) => {
+        setRecommendationFilter(value)
+        setPage(1)
+      }}
+    >
+      <SelectTrigger className="w-full text-sm">
+        <SelectValue placeholder="All Recommendations" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          <SelectLabel>Recommendation</SelectLabel>
+          <SelectItem value="all">All Recommendations</SelectItem>
+          <SelectItem value="remove">Remove</SelectItem>
+          <SelectItem value="call immediately">Consider</SelectItem>
+          <SelectItem value="shortlist">Shortlist</SelectItem>
+        </SelectGroup>
+      </SelectContent>
+    </Select>
       </div>
 
       {/* Applicants Table (mirrors Dashboard table) */}
@@ -141,14 +165,12 @@ export default function ApplicantsPage() {
                   <TableHead className="min-w-[120px] whitespace-nowrap">Phone</TableHead>
                   <TableHead className="min-w-[80px] whitespace-nowrap">Dispatch</TableHead>
                   <TableHead className="min-w-[100px] whitespace-nowrap">Ops Manager</TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">Recommendation
+                  </TableHead>
                   <TableHead className="min-w-[80px] whitespace-nowrap">CV</TableHead>
                   <TableHead className="min-w-[100px] whitespace-nowrap">Strengths</TableHead>
                   <TableHead className="min-w-[100px] whitespace-nowrap">Weaknesses</TableHead>
-                  <TableHead className="min-w-[200px]">
-                    <span className="text-sm font-medium text-neutral-600">Notes</span>
-                  </TableHead>
-                  <TableHead className="min-w-[120px] whitespace-nowrap">
-                    <span className="text-sm font-medium text-neutral-600">Recommendation</span>
+                  <TableHead className="min-w-[200px]">Notes
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -190,8 +212,8 @@ export default function ApplicantsPage() {
                   ))}
                 {!loading &&
                   paginatedData.map((c) => (
-                    <TableRow key={c.id} className="hover:bg-neutral-50">
-                      <TableCell className="font-medium min-w-[150px] whitespace-nowrap">{c.name}</TableCell>
+                    <TableRow key={c.id} className="hover:bg-neutral-50" >
+                      <TableCell className="font-medium min-w-[150px] whitespace-nowrap"  onClick={() => setSelected(c)}>{c.name}</TableCell>
                       <TableCell className="text-neutral-600 min-w-[200px] whitespace-nowrap">{c.email}</TableCell>
                       <TableCell className="text-neutral-600 min-w-[120px] whitespace-nowrap">{c.phone}</TableCell>
                       <TableCell className="min-w-[80px] whitespace-nowrap">
@@ -199,6 +221,9 @@ export default function ApplicantsPage() {
                       </TableCell>
                       <TableCell className="min-w-[100px] whitespace-nowrap">
                         {typeof c.operationsManager === "number" ? c.operationsManager : "-"}
+                      </TableCell>
+                                            <TableCell className="min-w-[120px] whitespace-nowrap">
+                        <RecommendationBadge value={c.recommendation} />
                       </TableCell>
                       <TableCell className="min-w-[80px] whitespace-nowrap">
                         {c.cvLink ? (
@@ -255,9 +280,6 @@ export default function ApplicantsPage() {
                           <span className="text-neutral-400">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="min-w-[120px] whitespace-nowrap">
-                        <RecommendationBadge value={c.recommendation} />
-                      </TableCell>
                     </TableRow>
                   ))}
                 {!loading && data.length === 0 && !error && (
@@ -271,7 +293,7 @@ export default function ApplicantsPage() {
             </Table>
           </div>
            {/* Pagination controls */}
-          <div className="flex justify-end items-center gap-2 mt-4">
+          <div className="flex justify-center items-center gap-2 mt-4">
             <Button
               variant="outline"
               size="sm"
@@ -317,22 +339,38 @@ export default function ApplicantsPage() {
           </div>
         </DialogContent>
       </Dialog>
+      <CandidateDrawer
+        candidate={selected}
+        onClose={() => setSelected(null)}
+        onUpdated={async () => { await fetchData(); }}
+      />
     </div>
   )
 }
 
 function RecommendationBadge({ value }: { value?: string }) {
   const v = (value || "").toLowerCase()
+
   if (v === "remove") {
     return <Badge variant="destructive">Remove</Badge>
   }
-  if (v === "consider") {
+
+  if (v === "call immediately") {
     return (
       <Badge className="bg-emerald-100 text-emerald-900" variant="secondary">
         Consider
       </Badge>
     )
   }
+
+  if (v === "shortlist") {
+    return (
+      <Badge className="bg-blue-100 text-blue-900" variant="secondary">
+        Shortlist
+      </Badge>
+    )
+  }
+
   return (
     <Badge variant="secondary" className="bg-neutral-100 text-neutral-800">
       —

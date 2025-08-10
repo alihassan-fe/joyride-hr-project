@@ -42,7 +42,7 @@ type Broadcast = {
 }
 
 // Change this URL to your actual n8n public webhook
-const WEBHOOK_URL = "https://oriormedia.app.n8n.cloud/webhook/candidates"
+const WEBHOOK_URL = `${process.env.NEXT_PUBLIC_WEBHOOK_DOMAIN}/webhook/candidates`
 
 export default function DashboardPage() {
   const [data, setData] = useState<WebhookCandidate[]>([])
@@ -143,6 +143,7 @@ export default function DashboardPage() {
       total: candidates.length,
       consider: candidates.filter((c) => c.recommendation?.toLowerCase() === "call immediately").length,
       remove: candidates.filter((c) => c.recommendation?.toLowerCase() === "remove").length,
+      shortlist: candidates.filter((c) => c.recommendation?.toLowerCase() === "shortlist").length,
       avgDispatch:
         candidates.length > 0
           ? (candidates.reduce((sum, c) => sum + (c.dispatch || 0), 0) / candidates.length).toFixed(1)
@@ -421,6 +422,10 @@ const groupedBarData = useMemo(() => {
                 <strong>{stats.remove}</strong>
                 {" marked as "}
                 <strong>Remove</strong>
+                {" and "}
+                <strong>{stats.shortlist}</strong>
+                {" marked as "}
+                <strong>Shortlist</strong>
                 {"."}
               </li>
               <li>
@@ -429,7 +434,7 @@ const groupedBarData = useMemo(() => {
                 {", Ops Manager: "}
                 <strong>{stats.avgOpsManager}</strong>.
               </li>
-              <li>Use Calendar to plan interviews and track PTO; drag on the calendar to create events quickly.</li>
+              <li>Use Calendar to plan interviews drag on the calendar to create events quickly.</li>
               <li>Use Broadcasts to send announcements to the team.</li>
               <li>Tip: Click “Refresh” above to pull the latest candidate scores from the webhook source.</li>
             </ul>
@@ -457,14 +462,14 @@ const groupedBarData = useMemo(() => {
                     <TableHead className="min-w-[120px] whitespace-nowrap">Phone</TableHead>
                     <TableHead className="min-w-[80px] whitespace-nowrap">Dispatch</TableHead>
                     <TableHead className="min-w-[100px] whitespace-nowrap">Ops Manager</TableHead>
+                    <TableHead className="min-w-[120px] whitespace-nowrap">
+                     Recommendation
+                    </TableHead>
                     <TableHead className="min-w-[80px] whitespace-nowrap">CV</TableHead>
                     <TableHead className="min-w-[100px] whitespace-nowrap">Strengths</TableHead>
                     <TableHead className="min-w-[100px] whitespace-nowrap">Weaknesses</TableHead>
                     <TableHead className="min-w-[200px]">
-                      <span className="text-sm font-medium text-neutral-600">Notes</span>
-                    </TableHead>
-                    <TableHead className="min-w-[120px] whitespace-nowrap">
-                      <span className="text-sm font-medium text-neutral-600">Recommendation</span>
+                     Notes
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -515,6 +520,9 @@ const groupedBarData = useMemo(() => {
                         </TableCell>
                         <TableCell className="min-w-[100px] whitespace-nowrap">
                           {typeof c.operationsManager === "number" ? c.operationsManager : "-"}
+                        </TableCell>
+                                                <TableCell className="min-w-[120px] whitespace-nowrap">
+                          <RecommendationBadge value={c.recommendation} />
                         </TableCell>
                         <TableCell className="min-w-[80px] whitespace-nowrap">
                           {c.cvLink ? (
@@ -571,9 +579,6 @@ const groupedBarData = useMemo(() => {
                             <span className="text-neutral-400">—</span>
                           )}
                         </TableCell>
-                        <TableCell className="min-w-[120px] whitespace-nowrap">
-                          <RecommendationBadge value={c.recommendation} />
-                        </TableCell>
                       </TableRow>
                     ))}
                   {!loading && data.length === 0 && !error && (
@@ -617,9 +622,11 @@ const groupedBarData = useMemo(() => {
 
 function RecommendationBadge({ value }: { value?: string }) {
   const v = (value || "").toLowerCase()
+
   if (v === "remove") {
     return <Badge variant="destructive">Remove</Badge>
   }
+
   if (v === "call immediately") {
     return (
       <Badge className="bg-emerald-100 text-emerald-900" variant="secondary">
@@ -627,6 +634,15 @@ function RecommendationBadge({ value }: { value?: string }) {
       </Badge>
     )
   }
+
+  if (v === "shortlist") {
+    return (
+      <Badge className="bg-blue-100 text-blue-900" variant="secondary">
+        Shortlist
+      </Badge>
+    )
+  }
+
   return (
     <Badge variant="secondary" className="bg-neutral-100 text-neutral-800">
       —

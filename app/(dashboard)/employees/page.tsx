@@ -70,7 +70,7 @@ export default function EmployeesPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Employee Directory</CardTitle>
-            <p className="text-sm text-muted-foreground">{"Manage your team and track PTO"}</p>
+            <p className="text-sm text-muted-foreground">{"Manage your team"}</p>
           </div>
           {isAdmin && <NewEmployeeDialog onCreated={fetchEmployees} />}
         </CardHeader>

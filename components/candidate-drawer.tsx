@@ -7,20 +7,19 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
-import type { Candidate, CandidateStatus, Job } from "@/lib/types"
+import type { Candidate, CandidateStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { CheckCircle2, FileText, User, X } from 'lucide-react'
 
+
 type Props = {
   candidate?: Candidate | null
-  jobs?: Job[]
   onClose?: () => void
   onUpdated?: () => Promise<void> | void
 }
 
 export function CandidateDrawer({
   candidate = null,
-  jobs = [],
   onClose = () => {},
   onUpdated = async () => {},
 }: Props) {
@@ -55,7 +54,7 @@ export function CandidateDrawer({
     await onUpdated()
   }
 
-  const statusOrder: CandidateStatus[] = ["New","Reviewed","Shortlisted","Interview","Hired","Rejected"]
+  const statusOrder: CandidateStatus[] = ["Call Immediatley", "Remove", "Shortlist"]
 
   return (
     <Sheet open={!!candidate} onOpenChange={(o) => { if (!o) onClose() }}>
@@ -70,16 +69,8 @@ export function CandidateDrawer({
           <div className="mt-4 space-y-6 py-4 px-5 overflow-auto">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-neutral-500">Status</span>
-              <Badge variant="secondary">{candidate.status}</Badge>
+              <Badge variant="secondary">{candidate.recommendation}</Badge>
               <span className="text-sm text-neutral-500">Score</span>
-              <Badge variant="secondary" className="bg-emerald-100 text-emerald-900">{candidate.scores?.overall ?? "-"}</Badge>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-neutral-500">Applied for</span>
-              <span className="text-sm">
-                {jobs.find(j => j.id === candidate.applied_job_id)?.title ?? "-"}
-              </span>
             </div>
 
             <Separator />
@@ -91,18 +82,18 @@ export function CandidateDrawer({
             </div>
 
             <div className="space-y-2">
-              <div className="text-sm text-neutral-500">Skills</div>
+              <div className="text-sm text-neutral-500">Strengths</div>
               <div className="flex flex-wrap gap-2">
-                {(candidate.skills || []).map((s, i) => (
+                {(candidate.strengths || []).map((s, i) => (
                   <Badge key={i} className="bg-neutral-100 text-neutral-800" variant="secondary">{s}</Badge>
                 ))}
               </div>
             </div>
 
             <div className="space-y-2">
-              <div className="text-sm text-neutral-500">Work History</div>
+              <div className="text-sm text-neutral-500">Weaknesses</div>
               <ul className="list-disc pl-5 space-y-1">
-                {(candidate.work_history || []).map((w, i) => (
+                {(candidate.weaknesses || []).map((w, i) => (
                   <li key={i} className="text-sm">{w}</li>
                 ))}
               </ul>
@@ -125,8 +116,8 @@ export function CandidateDrawer({
                 {statusOrder.map((s) => (
                   <Button
                     key={s}
-                    variant={s === "Rejected" ? "destructive" : "secondary"}
-                    className={cn(s !== "Rejected" ? "bg-neutral-100 text-neutral-900 hover:bg-neutral-200" : "")}
+                    variant={s === "Remove" ? "destructive" : "secondary"}
+                    className={cn(s !== "Remove" ? "bg-neutral-100 text-neutral-900 hover:bg-neutral-200" : "")}
                     onClick={() => updateStatus(s)}
                     disabled={saving}
                   >
@@ -135,9 +126,9 @@ export function CandidateDrawer({
                   </Button>
                 ))}
               </div>
-              {candidate.cv_url && (
+              {candidate.cvLink && (
                 <a
-                  href={candidate.cv_url}
+                  href={candidate.cvLink}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center text-sm text-neutral-700 hover:underline"

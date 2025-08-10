@@ -36,7 +36,7 @@ export default function LoginPage() {
     <div className="min-h-[100dvh] flex items-center justify-center bg-neutral-50 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="flex flex-col items-center gap-3">
-        <img src="/rsz_jr_color_long.png" alt="Company logo" className="h-6 w-auto" />
+        <img src="/rsz_jr_color_long.png" alt="Company logo" className="h-8 w-auto" />
           <CardTitle className="text-xl">Sign in to Joyride HR</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">

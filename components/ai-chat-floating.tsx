@@ -10,7 +10,7 @@ import { Bot, Send, X } from 'lucide-react'
 type Message = { id: string; role: "user" | "assistant"; content: string }
 
 export function AIChatFloating() {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
@@ -35,32 +35,28 @@ export function AIChatFloating() {
     setMessages((m) => [...m, userMsg])
     setInput("")
     setLoading(true)
+
     try {
-      const res = await fetch("/api/ai/chat", {
+      const res = await fetch("https://oriormedia.app.n8n.cloud/webhook/ai-candidates-query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [...messages, userMsg] }),
+        body: JSON.stringify({ query: prompt })
       })
-      if (!res.ok || !res.body) {
-        const j = await res.json().catch(() => ({}))
-        throw new Error(j.error || "AI error")
+
+      if (!res.ok) {
+        throw new Error(`Error ${res.status}: ${res.statusText}`)
       }
-      // Stream reader fallback to text concat
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let assistantContent = ""
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        assistantContent += decoder.decode(value, { stream: true })
-        setMessages((msgs) => {
-          const last = msgs[msgs.length - 1]
-          if (last?.role === "assistant" && last.id.startsWith("a-")) {
-            return [...msgs.slice(0, -1), { ...last, content: assistantContent }]
-          }
-          return [...msgs, { id: `a-${Date.now()}`, role: "assistant", content: assistantContent }]
-        })
+
+      let textResponse = ""
+      const contentType = res.headers.get("content-type") || ""
+      if (contentType.includes("application/json")) {
+        const json = await res.json()
+        textResponse = JSON.stringify(json, null, 2)
+      } else {
+        textResponse = await res.text()
       }
+
+      setMessages((m) => [...m, { id: `a-${Date.now()}`, role: "assistant", content: textResponse }])
     } catch (e: any) {
       setMessages((m) => [...m, { id: `a-${Date.now()}`, role: "assistant", content: `Error: ${e.message}` }])
     } finally {
@@ -79,16 +75,22 @@ export function AIChatFloating() {
       </button>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
-          <div className="p-4 border-b flex items-center justify-between">
+          <div className="p-2 border-b flex items-center justify-between">
             <SheetHeader>
               <SheetTitle>AI Assistant</SheetTitle>
             </SheetHeader>
           </div>
-          <ScrollArea className="flex-1 p-4">
+          <ScrollArea className="flex-1 px-4 h-full">
             <div className="space-y-3">
               {messages.map((m) => (
                 <div key={m.id} className={m.role === "user" ? "text-right" : "text-left"}>
-                  <div className={m.role === "user" ? "inline-block bg-neutral-900 text-white px-3 py-2 rounded-lg" : "inline-block bg-neutral-100 text-neutral-900 px-3 py-2 rounded-lg"}>
+                  <div
+                    className={
+                      m.role === "user"
+                        ? "inline-block bg-neutral-900 text-white px-3 py-2 rounded-lg"
+                        : "inline-block bg-neutral-100 text-neutral-900 px-3 py-2 rounded-lg whitespace-pre-wrap"
+                    }
+                  >
                     {m.content}
                   </div>
                 </div>
@@ -96,7 +98,7 @@ export function AIChatFloating() {
               <div ref={endRef} />
             </div>
           </ScrollArea>
-          <div className="p-3 border-t">
+          <div className="p-3 border-t sticky bottom-0 bg-white">
             <div className="flex gap-2">
               <Input
                 placeholder="Ask: List all candidates with score above 7"
