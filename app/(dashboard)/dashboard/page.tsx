@@ -41,20 +41,36 @@ type Broadcast = {
   createdBy?: string
 }
 
+type Event = {
+  id: number | string
+  title: string
+  type: string
+  start_time: string
+  all_day: boolean
+}
+
+type OutboxItem = {
+  id: number | string
+  status: string
+}
+
 // Change this URL to your actual n8n public webhook
 const WEBHOOK_URL = `${process.env.NEXT_PUBLIC_WEBHOOK_DOMAIN}/webhook/candidates`
 
 export default function DashboardPage() {
   const [data, setData] = useState<WebhookCandidate[]>([])
-  console.log("data", data);
+  console.log("data", data)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>("")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogTitle, setDialogTitle] = useState("")
   const [dialogItems, setDialogItems] = useState<string[]>([])
 
-  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
-  const [broadcastsLoading, setBroadcastsLoading] = useState(false)
+  const [events, setEvents] = useState<Event[]>([])
+  const [eventsLoading, setEventsLoading] = useState(false)
+
+  const [outbox, setOutbox] = useState<OutboxItem[]>([])
+  const [outboxLoading, setOutboxLoading] = useState(false)
 
   async function fetchData() {
     setLoading(true)
@@ -75,25 +91,44 @@ export default function DashboardPage() {
     }
   }
 
-  async function fetchBroadcasts() {
-    setBroadcastsLoading(true)
+  async function fetchEvents() {
+    setEventsLoading(true)
     try {
-      const res = await fetch("/api/broadcasts", { cache: "no-store" })
-      if (!res.ok) throw new Error("Failed to load broadcasts")
-      const json = (await res.json()) as Broadcast[] | { data: Broadcast[] }
-      const arr = Array.isArray(json) ? json : (json as any).data
-      if (!Array.isArray(arr)) throw new Error("Unexpected broadcasts response shape")
-      setBroadcasts(arr.length > 0 ? arr : [])
+      const res = await fetch("/api/calendar/events", { cache: "no-store" })
+      if (!res.ok) throw new Error("Failed to load events")
+      const json = await res.json()
+      const arr = Array.isArray(json) ? json : json.data || []
+      // Sort by start_time and get upcoming events
+      const upcoming = arr
+        .filter((event: any) => new Date(event.start_time) >= new Date())
+        .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+      setEvents(upcoming)
     } catch {
-      setBroadcasts([])
+      setEvents([])
     } finally {
-      setBroadcastsLoading(false)
+      setEventsLoading(false)
+    }
+  }
+
+  async function fetchOutbox() {
+    setOutboxLoading(true)
+    try {
+      const res = await fetch("/api/calendar/outbox", { cache: "no-store" })
+      if (!res.ok) throw new Error("Failed to load outbox")
+      const json = await res.json()
+      const arr = Array.isArray(json) ? json : json.data || []
+      setOutbox(arr.slice(0, 5)) // Latest 5 notifications
+    } catch {
+      setOutbox([])
+    } finally {
+      setOutboxLoading(false)
     }
   }
 
   useEffect(() => {
     fetchData()
-    fetchBroadcasts()
+    fetchEvents()
+    fetchOutbox()
   }, [])
 
   function openListDialog(title: string, items: string[] = []) {
@@ -156,20 +191,21 @@ export default function DashboardPage() {
   }, [data])
 
   // New charts data
-const groupedBarData = useMemo(() => {
-  return [...data]
-    .sort(
-      (a, b) =>
-        (Number(b.dispatch ?? 0) + Number(b.operationsManager ?? 0)) -
-        (Number(a.dispatch ?? 0) + Number(a.operationsManager ?? 0))
-    )
-    .slice(0, 5) // top 5 results
-    .map((c) => ({
-      name: c.name,
-      dispatch: Number(c.dispatch ?? 0),
-      ops: Number(c.operationsManager ?? 0),
-    }));
-}, [data]);
+  const groupedBarData = useMemo(() => {
+    return [...data]
+      .sort(
+        (a, b) =>
+          Number(b.dispatch ?? 0) +
+          Number(b.operationsManager ?? 0) -
+          (Number(a.dispatch ?? 0) + Number(a.operationsManager ?? 0)),
+      )
+      .slice(0, 5) // top 5 results
+      .map((c) => ({
+        name: c.name,
+        dispatch: Number(c.dispatch ?? 0),
+        ops: Number(c.operationsManager ?? 0),
+      }))
+  }, [data])
 
   const recommendationPieData = useMemo(() => {
     const consider = stats.consider
@@ -182,7 +218,6 @@ const groupedBarData = useMemo(() => {
 
   return (
     <div className="space-y-6">
-
       {/* Header row */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
@@ -284,8 +319,9 @@ const groupedBarData = useMemo(() => {
                     <YAxis allowDecimals={false} />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend />
-<Bar dataKey="dispatch" name="Dispatch" fill="var(--chart-3)" radius={6} />
-<Bar dataKey="ops" name="Ops Manager" fill="var(--chart-5)" radius={6} />                </BarChart>
+                    <Bar dataKey="dispatch" name="Dispatch" fill="var(--chart-3)" radius={6} />
+                    <Bar dataKey="ops" name="Ops Manager" fill="var(--chart-5)" radius={6} />
+                  </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
             )}
@@ -304,7 +340,7 @@ const groupedBarData = useMemo(() => {
               <ChartContainer
                 config={{
                   consider: { label: "Consider", color: "var(--chart-3)" },
-                  remove: { label: "Remove", color: "ar(--chart-5)" },
+                  remove: { label: "Remove", color: "var(--chart-5)" },
                 }}
                 className="h-[320px]"
               >
@@ -312,11 +348,18 @@ const groupedBarData = useMemo(() => {
                   <PieChart>
                     <ChartTooltip content={<ChartTooltipContent nameKey="label" />} />
                     <Legend />
-                   <Pie data={recommendationPieData} dataKey="value" nameKey="label" innerRadius={70} outerRadius={110} strokeWidth={2}>
-  {recommendationPieData.map((entry) => (
-    <Cell key={entry.key} fill={entry.key === "consider" ? "var(--chart-3)" : "var(--chart-5)"} />
-  ))}
-</Pie>
+                    <Pie
+                      data={recommendationPieData}
+                      dataKey="value"
+                      nameKey="label"
+                      innerRadius={70}
+                      outerRadius={110}
+                      strokeWidth={2}
+                    >
+                      {recommendationPieData.map((entry) => (
+                        <Cell key={entry.key} fill={entry.key === "consider" ? "var(--chart-3)" : "var(--chart-5)"} />
+                      ))}
+                    </Pie>
                   </PieChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -341,15 +384,15 @@ const groupedBarData = useMemo(() => {
         </CardContent>
       </Card>
 
-      {/* Two-column info: Recent Broadcasts + Quick Insights */}
+      {/* Two-column info: Recent Events + Quick Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Small table: Recent Broadcasts */}
+        {/* Recent Events */}
         <Card className="rounded-2xl shadow-md">
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-base">Recent Broadcasts</CardTitle>
+            <CardTitle className="text-base">Upcoming Events</CardTitle>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/broadcasts">
-                View all
+              <Link href="/calendar">
+                View Calendar
                 <ArrowRight className="h-4 w-4 ml-1" />
               </Link>
             </Button>
@@ -359,44 +402,61 @@ const groupedBarData = useMemo(() => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[220px]">Title</TableHead>
-                    <TableHead className="min-w-[140px]">Created</TableHead>
-                    <TableHead className="min-w-[120px]">By</TableHead>
+                    <TableHead className="min-w-[180px]">Event</TableHead>
+                    <TableHead className="min-w-[100px]">Type</TableHead>
+                    <TableHead className="min-w-[140px]">Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {broadcastsLoading &&
+                  {eventsLoading &&
                     Array.from({ length: 3 }).map((_, i) => (
                       <TableRow key={i}>
                         <TableCell>
-                          <div className="h-4 w-48 rounded bg-neutral-100 animate-pulse" />
+                          <div className="h-4 w-32 rounded bg-neutral-100 animate-pulse" />
+                        </TableCell>
+                        <TableCell>
+                          <div className="h-4 w-16 rounded bg-neutral-100 animate-pulse" />
                         </TableCell>
                         <TableCell>
                           <div className="h-4 w-24 rounded bg-neutral-100 animate-pulse" />
                         </TableCell>
-                        <TableCell>
-                          <div className="h-4 w-20 rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
                       </TableRow>
                     ))}
-                  {!broadcastsLoading &&
-                    broadcasts.slice(0, 5).map((b) => {
-                      const created =
-                        b.createdAt || b.created_at
-                          ? new Date((b.createdAt as string) || (b.created_at as string)).toLocaleString()
-                          : ""
+                  {!eventsLoading &&
+                    events.slice(0, 5).map((event) => {
+                      const startDate = new Date(event.start_time).toLocaleDateString()
+                      const startTime = new Date(event.start_time).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
                       return (
-                        <TableRow key={String(b.id)}>
-                          <TableCell className="font-medium">{b.title}</TableCell>
-                          <TableCell className="text-neutral-600">{created}</TableCell>
-                          <TableCell className="text-neutral-600">{b.createdBy || b.created_by || "—"}</TableCell>
+                        <TableRow key={event.id}>
+                          <TableCell className="font-medium">{event.title}</TableCell>
+                          <TableCell>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                event.type === "interview"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : event.type === "pto"
+                                    ? "bg-green-100 text-green-800"
+                                    : event.type === "holiday"
+                                      ? "bg-purple-100 text-purple-800"
+                                      : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {event.type}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-neutral-600">
+                            {startDate} {!event.all_day && startTime}
+                          </TableCell>
                         </TableRow>
                       )
                     })}
-                  {!broadcastsLoading && broadcasts.length === 0 && (
+                  {!eventsLoading && events.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={3} className="text-sm text-neutral-500">
-                        No broadcasts yet.
+                        No upcoming events.
                       </TableCell>
                     </TableRow>
                   )}
@@ -406,7 +466,6 @@ const groupedBarData = useMemo(() => {
           </CardContent>
         </Card>
 
-        {/* Useful information card */}
         <Card className="rounded-2xl shadow-md">
           <CardHeader>
             <CardTitle className="text-base">Quick Insights</CardTitle>
@@ -434,14 +493,33 @@ const groupedBarData = useMemo(() => {
                 {", Ops Manager: "}
                 <strong>{stats.avgOpsManager}</strong>.
               </li>
-              <li>Use Calendar to plan interviews drag on the calendar to create events quickly.</li>
-              <li>Use Broadcasts to send announcements to the team.</li>
-              <li>Tip: Click “Refresh” above to pull the latest candidate scores from the webhook source.</li>
+              <li>
+                {"Upcoming events: "}
+                <strong>{events.length}</strong>
+                {" scheduled. "}
+                {events.filter((e) => e.type === "interview").length > 0 &&
+                  `${events.filter((e) => e.type === "interview").length} interviews planned.`}
+              </li>
+              {outbox.length > 0 && (
+                <li>
+                  {"Recent notifications: "}
+                  <strong>{outbox.filter((n) => n.status === "sent").length}</strong>
+                  {" sent, "}
+                  <strong>{outbox.filter((n) => n.status === "queued").length}</strong>
+                  {" queued."}
+                </li>
+              )}
+              <li>Use Calendar to plan interviews — drag on the calendar to create events quickly.</li>
             </ul>
-            <div className="pt-2">
-              <Button asChild>
+            <div className="pt-2 flex gap-2">
+              <Button asChild size="sm">
                 <Link href="/calendar">Open Calendar</Link>
               </Button>
+              {outbox.length > 0 && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/calendar">View Outbox</Link>
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -453,143 +531,139 @@ const groupedBarData = useMemo(() => {
           <CardTitle className="text-base">Candidates</CardTitle>
         </CardHeader>
         <CardContent>
-         <div className="border rounded-md overflow-x-auto w-full max-w-[1190px]">
-              <Table className="w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[150px] whitespace-nowrap">Name</TableHead>
-                    <TableHead className="min-w-[200px] whitespace-nowrap">Email</TableHead>
-                    <TableHead className="min-w-[120px] whitespace-nowrap">Phone</TableHead>
-                    <TableHead className="min-w-[80px] whitespace-nowrap">Dispatch</TableHead>
-                    <TableHead className="min-w-[100px] whitespace-nowrap">Ops Manager</TableHead>
-                    <TableHead className="min-w-[120px] whitespace-nowrap">
-                     Recommendation
-                    </TableHead>
-                    <TableHead className="min-w-[80px] whitespace-nowrap">CV</TableHead>
-                    <TableHead className="min-w-[100px] whitespace-nowrap">Strengths</TableHead>
-                    <TableHead className="min-w-[100px] whitespace-nowrap">Weaknesses</TableHead>
-                    <TableHead className="min-w-[200px]">
-                     Notes
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading &&
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="min-w-[150px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[140px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[200px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[180px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[120px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[80px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[60px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[80px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[60px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[200px]">
-                          <div className="h-4 w-full max-w-[180px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[120px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  {!loading &&
-                    data.slice(0, 8).map((c) => (
-                      <TableRow key={c.id} className="hover:bg-neutral-50">
-                        <TableCell className="font-medium min-w-[150px] whitespace-nowrap">{c.name}</TableCell>
-                        <TableCell className="text-neutral-600 min-w-[200px] whitespace-nowrap">{c.email}</TableCell>
-                        <TableCell className="text-neutral-600 min-w-[120px] whitespace-nowrap">{c.phone}</TableCell>
-                        <TableCell className="min-w-[80px] whitespace-nowrap">
-                          {typeof c.dispatch === "number" ? c.dispatch : "-"}
-                        </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
-                          {typeof c.operationsManager === "number" ? c.operationsManager : "-"}
-                        </TableCell>
-                                                <TableCell className="min-w-[120px] whitespace-nowrap">
-                          <RecommendationBadge value={c.recommendation} />
-                        </TableCell>
-                        <TableCell className="min-w-[80px] whitespace-nowrap">
-                          {c.cvLink ? (
-                            <a
-                              href={c.cvLink}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center text-sm text-neutral-700 hover:underline"
-                            >
-                              <FileText className="h-4 w-4 mr-1.5" />
-                              Open
-                              <ExternalLink className="h-3.5 w-3.5 ml-1" />
-                            </a>
-                          ) : (
-                            <span className="text-neutral-400">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openListDialog(`Strengths — ${c.name}`, c.strengths || [])}
-                            disabled={!c.strengths || c.strengths.length === 0}
-                          >
-                            View
-                          </Button>
-                        </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openListDialog(`Weaknesses — ${c.name}`, c.weaknesses || [])}
-                            disabled={!c.weaknesses || c.weaknesses.length === 0}
-                          >
-                            View
-                          </Button>
-                        </TableCell>
-                        <TableCell className="min-w-[200px]">
-                          {c.notes ? (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-flex items-center gap-1 max-w-[180px] truncate cursor-help">
-                                    <Info className="h-3.5 w-3.5 text-neutral-500" />
-                                    <span className="text-neutral-700">{c.notes}</span>
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-xs">
-                                  <p className="text-xs">{c.notes}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          ) : (
-                            <span className="text-neutral-400">—</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  {!loading && data.length === 0 && !error && (
-                    <TableRow>
-                      <TableCell colSpan={10} className="text-sm text-neutral-500">
-                        No candidates found from the webhook.
+          <div className="border rounded-md overflow-x-auto w-full max-w-[1190px]">
+            <Table className="w-full">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[150px] whitespace-nowrap">Name</TableHead>
+                  <TableHead className="min-w-[200px] whitespace-nowrap">Email</TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">Phone</TableHead>
+                  <TableHead className="min-w-[80px] whitespace-nowrap">Dispatch</TableHead>
+                  <TableHead className="min-w-[100px] whitespace-nowrap">Ops Manager</TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">Recommendation</TableHead>
+                  <TableHead className="min-w-[80px] whitespace-nowrap">CV</TableHead>
+                  <TableHead className="min-w-[100px] whitespace-nowrap">Strengths</TableHead>
+                  <TableHead className="min-w-[100px] whitespace-nowrap">Weaknesses</TableHead>
+                  <TableHead className="min-w-[200px]">Notes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading &&
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="min-w-[150px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[140px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[200px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[180px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[60px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[60px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[200px]">
+                        <div className="h-4 w-full max-w-[180px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
                       </TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  ))}
+                {!loading &&
+                  data.slice(0, 8).map((c) => (
+                    <TableRow key={c.id} className="hover:bg-neutral-50">
+                      <TableCell className="font-medium min-w-[150px] whitespace-nowrap">{c.name}</TableCell>
+                      <TableCell className="text-neutral-600 min-w-[200px] whitespace-nowrap">{c.email}</TableCell>
+                      <TableCell className="text-neutral-600 min-w-[120px] whitespace-nowrap">{c.phone}</TableCell>
+                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                        {typeof c.dispatch === "number" ? c.dispatch : "-"}
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        {typeof c.operationsManager === "number" ? c.operationsManager : "-"}
+                      </TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
+                        <RecommendationBadge value={c.recommendation} />
+                      </TableCell>
+                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                        {c.cvLink ? (
+                          <a
+                            href={c.cvLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center text-sm text-neutral-700 hover:underline"
+                          >
+                            <FileText className="h-4 w-4 mr-1.5" />
+                            Open
+                            <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                          </a>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openListDialog(`Strengths — ${c.name}`, c.strengths || [])}
+                          disabled={!c.strengths || c.strengths.length === 0}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openListDialog(`Weaknesses — ${c.name}`, c.weaknesses || [])}
+                          disabled={!c.weaknesses || c.weaknesses.length === 0}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                      <TableCell className="min-w-[200px]">
+                        {c.notes ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center gap-1 max-w-[180px] truncate cursor-help">
+                                  <Info className="h-3.5 w-3.5 text-neutral-500" />
+                                  <span className="text-neutral-700">{c.notes}</span>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="text-xs">{c.notes}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                {!loading && data.length === 0 && !error && (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-sm text-neutral-500">
+                      No candidates found from the webhook.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
