@@ -31,16 +31,6 @@ type WebhookCandidate = {
   recommendation?: string // 'Remove' | 'Consider' | undefined
 }
 
-type Broadcast = {
-  id: number | string
-  title: string
-  body?: string
-  created_at?: string
-  createdAt?: string
-  created_by?: string
-  createdBy?: string
-}
-
 // Change this URL to your actual n8n public webhook
 const WEBHOOK_URL = `${process.env.NEXT_PUBLIC_WEBHOOK_DOMAIN}/webhook/candidates`
 
@@ -52,9 +42,6 @@ export default function DashboardPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogTitle, setDialogTitle] = useState("")
   const [dialogItems, setDialogItems] = useState<string[]>([])
-
-  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
-  const [broadcastsLoading, setBroadcastsLoading] = useState(false)
 
   async function fetchData() {
     setLoading(true)
@@ -75,25 +62,8 @@ export default function DashboardPage() {
     }
   }
 
-  async function fetchBroadcasts() {
-    setBroadcastsLoading(true)
-    try {
-      const res = await fetch("/api/broadcasts", { cache: "no-store" })
-      if (!res.ok) throw new Error("Failed to load broadcasts")
-      const json = (await res.json()) as Broadcast[] | { data: Broadcast[] }
-      const arr = Array.isArray(json) ? json : (json as any).data
-      if (!Array.isArray(arr)) throw new Error("Unexpected broadcasts response shape")
-      setBroadcasts(arr.length > 0 ? arr : [])
-    } catch {
-      setBroadcasts([])
-    } finally {
-      setBroadcastsLoading(false)
-    }
-  }
-
   useEffect(() => {
     fetchData()
-    fetchBroadcasts()
   }, [])
 
   function openListDialog(title: string, items: string[] = []) {
@@ -341,71 +311,6 @@ const groupedBarData = useMemo(() => {
         </CardContent>
       </Card>
 
-      {/* Two-column info: Recent Broadcasts + Quick Insights */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Small table: Recent Broadcasts */}
-        <Card className="rounded-2xl shadow-md">
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-base">Recent Broadcasts</CardTitle>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/broadcasts">
-                View all
-                <ArrowRight className="h-4 w-4 ml-1" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="border rounded-md overflow-x-auto max-w-[1180px] w-full">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[220px]">Title</TableHead>
-                    <TableHead className="min-w-[140px]">Created</TableHead>
-                    <TableHead className="min-w-[120px]">By</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {broadcastsLoading &&
-                    Array.from({ length: 3 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          <div className="h-4 w-48 rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell>
-                          <div className="h-4 w-24 rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell>
-                          <div className="h-4 w-20 rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  {!broadcastsLoading &&
-                    broadcasts.slice(0, 5).map((b) => {
-                      const created =
-                        b.createdAt || b.created_at
-                          ? new Date((b.createdAt as string) || (b.created_at as string)).toLocaleString()
-                          : ""
-                      return (
-                        <TableRow key={String(b.id)}>
-                          <TableCell className="font-medium">{b.title}</TableCell>
-                          <TableCell className="text-neutral-600">{created}</TableCell>
-                          <TableCell className="text-neutral-600">{b.createdBy || b.created_by || "—"}</TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  {!broadcastsLoading && broadcasts.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-sm text-neutral-500">
-                        No broadcasts yet.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Useful information card */}
         <Card className="rounded-2xl shadow-md">
           <CardHeader>
@@ -435,7 +340,6 @@ const groupedBarData = useMemo(() => {
                 <strong>{stats.avgOpsManager}</strong>.
               </li>
               <li>Use Calendar to plan interviews drag on the calendar to create events quickly.</li>
-              <li>Use Broadcasts to send announcements to the team.</li>
               <li>Tip: Click “Refresh” above to pull the latest candidate scores from the webhook source.</li>
             </ul>
             <div className="pt-2">
@@ -445,9 +349,8 @@ const groupedBarData = useMemo(() => {
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Candidate Table (existing, kept) */}
+
       <Card className="rounded-2xl shadow-md">
         <CardHeader>
           <CardTitle className="text-base">Candidates</CardTitle>

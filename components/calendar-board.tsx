@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 
-type EventType = "pto" | "holiday" | "interview" | "meeting"
+type EventType = "holiday" | "interview" | "meeting"
 type Draft = {
   id?: number
   title: string
@@ -48,7 +48,6 @@ type OutboxItem = {
 
 function typeBadge(t: EventType) {
   const map: Record<EventType, string> = {
-    pto: "bg-amber-100 text-amber-800",
     holiday: "bg-emerald-100 text-emerald-800",
     interview: "bg-purple-100 text-purple-800",
     meeting: "bg-slate-100 text-slate-800",
@@ -64,6 +63,7 @@ export function CalendarBoard() {
 
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Draft | null>(null)
+  console.log("🚀 ~ CalendarBoard ~ draft:", draft)
 
   const [outbox, setOutbox] = useState<OutboxItem[]>([])
   const [previewItem, setPreviewItem] = useState<OutboxItem | null>(null)
@@ -381,7 +381,7 @@ export function CalendarBoard() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl">
+    <DialogContent className="!max-w-[800px] w-full">
           <DialogHeader>
             <DialogTitle>{draft?.id ? "Edit Event" : "New Event"}</DialogTitle>
           </DialogHeader>
@@ -394,17 +394,16 @@ export function CalendarBoard() {
                 placeholder="Event title"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 w-full">
               <Label>Type</Label>
               <Select
                 value={draft?.type}
                 onValueChange={(v: EventType) => setDraft((d) => (d ? { ...d, type: v } : d))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pto">PTO</SelectItem>
+                <SelectContent className="w-full">
                   <SelectItem value="holiday">Public Holiday</SelectItem>
                   <SelectItem value="interview">Interview</SelectItem>
                   <SelectItem value="meeting">Meeting</SelectItem>
@@ -416,7 +415,7 @@ export function CalendarBoard() {
               <Textarea
                 value={draft?.description || ""}
                 onChange={(e) => setDraft((d) => (d ? { ...d, description: e.target.value } : d))}
-                placeholder="Agenda, notes, or PTO reason..."
+                placeholder="Agenda, notes..."
               />
             </div>
             <div className="space-y-2">

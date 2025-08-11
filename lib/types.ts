@@ -18,7 +18,7 @@ id: number
   strengths?: string[]
   weaknesses?: string[]
   notes?: string
-  recommendation?: string // 'Remove' | 'Consider' | undefined
+  recommendation?: CandidateStatus | null // 'Remove' | 'Consider' | undefined
 }
 
 export type Employee = {
@@ -27,7 +27,6 @@ export type Employee = {
   email: string
   role: string
   start_date: string
-  pto_balance: number
 }
 
 export type Event = {
