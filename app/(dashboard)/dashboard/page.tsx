@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { ExternalLink, RefreshCw, FileText, Info, ArrowRight } from "lucide-react"
-import { Candidate } from "@/lib/types"
+import { Candidate, OutboxItem } from "@/lib/types"
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false })
 
@@ -26,6 +26,10 @@ export default function DashboardPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogTitle, setDialogTitle] = useState("")
   const [dialogItems, setDialogItems] = useState<string[]>([])
+  const [events, setEvents] = useState<Event[]>([])
+  const [eventsLoading, setEventsLoading] = useState(false)
+  const [outbox, setOutbox] = useState<OutboxItem[]>([])
+  const [outboxLoading, setOutboxLoading] = useState(false)
 
   async function fetchData() {
   try {
@@ -38,8 +42,44 @@ export default function DashboardPage() {
     }
   }
 
+  async function fetchEvents() {
+    setEventsLoading(true)
+    try {
+      const res = await fetch("/api/calendar/events", { cache: "no-store" })
+      if (!res.ok) throw new Error("Failed to load events")
+      const json = await res.json()
+      const arr = Array.isArray(json) ? json : json.data || []
+      // Sort by start_time and get upcoming events
+      const upcoming = arr
+        .filter((event: any) => new Date(event.start_time) >= new Date())
+        .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+      setEvents(upcoming)
+    } catch {
+      setEvents([])
+    } finally {
+      setEventsLoading(false)
+    }
+  }
+
+    async function fetchOutbox() {
+    setOutboxLoading(true)
+    try {
+      const res = await fetch("/api/calendar/outbox", { cache: "no-store" })
+      if (!res.ok) throw new Error("Failed to load outbox")
+      const json = await res.json()
+      const arr = Array.isArray(json) ? json : json.data || []
+      setOutbox(arr.slice(0, 5)) // Latest 5 notifications
+    } catch {
+      setOutbox([])
+    } finally {
+      setOutboxLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchData()
+    fetchEvents()
+    fetchOutbox()
   }, [])
 
   function openListDialog(title: string, items: string[] = []) {
@@ -287,7 +327,88 @@ const groupedBarData = useMemo(() => {
         </CardContent>
       </Card>
 
-        {/* Useful information card */}
+     {/* Two-column info: Recent Events + Quick Insights */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Events */}
+        <Card className="rounded-2xl shadow-md">
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="text-base">Upcoming Events</CardTitle>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/calendar">
+                View Calendar
+                <ArrowRight className="h-4 w-4 ml-1" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="border rounded-md overflow-x-auto max-w-[1180px] w-full">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[180px]">Event</TableHead>
+                    <TableHead className="min-w-[100px]">Type</TableHead>
+                    <TableHead className="min-w-[140px]">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {eventsLoading &&
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <div className="h-4 w-32 rounded bg-neutral-100 animate-pulse" />
+                        </TableCell>
+                        <TableCell>
+                          <div className="h-4 w-16 rounded bg-neutral-100 animate-pulse" />
+                        </TableCell>
+                        <TableCell>
+                          <div className="h-4 w-24 rounded bg-neutral-100 animate-pulse" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  {!eventsLoading &&
+                    events.slice(0, 5).map((event: any) => {
+                      const startDate = new Date(event.start_time).toLocaleDateString()
+                      const startTime = new Date(event.start_time).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                      return (
+                        <TableRow key={event.id}>
+                          <TableCell className="font-medium">{event.title}</TableCell>
+                          <TableCell>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                event.type === "interview"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : event.type === "pto"
+                                    ? "bg-green-100 text-green-800"
+                                    : event.type === "holiday"
+                                      ? "bg-purple-100 text-purple-800"
+                                      : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {event.type}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-neutral-600">
+                            {startDate} {!event.all_day && startTime}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  {!eventsLoading && events.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-sm text-neutral-500">
+                        No upcoming events.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="rounded-2xl shadow-md">
           <CardHeader>
             <CardTitle className="text-base">Quick Insights</CardTitle>
@@ -296,37 +417,56 @@ const groupedBarData = useMemo(() => {
             <ul className="space-y-2 list-disc pl-5">
               <li>
                 {"You have "}
-                <strong>{stats.consider}</strong>
+                <Badge variant="secondary" className="bg-purple-100 text-purple-800">{stats.consider}</Badge>
                 {" candidates marked as "}
-                <strong>Consider</strong>
+                <strong>Consider</strong>  
                 {" and "}
-                <strong>{stats.remove}</strong>
+                <Badge variant="secondary" className="bg-purple-100 text-purple-800">{stats.remove}</Badge>
                 {" marked as "}
                 <strong>Remove</strong>
                 {" and "}
-                <strong>{stats.shortlist}</strong>
+                <Badge variant="secondary" className="bg-purple-100 text-purple-800">{stats.shortlist}</Badge>
                 {" marked as "}
                 <strong>Shortlist</strong>
                 {"."}
               </li>
               <li>
                 {"Average scores — Dispatch: "}
-                <strong>{stats.avgDispatch}</strong>
+                <Badge variant="secondary" className="bg-purple-100 text-purple-800">{stats.avgDispatch}</Badge>
                 {", Ops Manager: "}
-                <strong>{stats.avgOpsManager}</strong>.
+                <Badge variant="secondary" className="bg-purple-100 text-purple-800">{stats.avgOpsManager}</Badge>.
               </li>
-              <li>Use Calendar to plan interviews drag on the calendar to create events quickly.</li>
-              <li>Tip: Click “Refresh” above to pull the latest candidate scores from the webhook source.</li>
+              <li>
+                {"Upcoming events: "}
+                <Badge variant="secondary" className="bg-purple-100 text-purple-800">{events.length}</Badge>
+                {" scheduled. "}
+                {events.filter((e) => e.type === "interview").length > 0 &&
+                  `${events.filter((e) => e.type === "interview").length} interviews planned.`}
+              </li>
+              {outbox.length > 0 && (
+                <li>
+                  {"Recent notifications: "}
+                  <Badge variant="secondary" className="bg-purple-100 text-purple-800">{outbox.filter((n) => n.status === "sent").length}</Badge>
+                  {" sent, "}
+                  <Badge variant="secondary" className="bg-purple-100 text-purple-800">{outbox.filter((n) => n.status === "queued").length}</Badge>
+                  {" queued."}
+                </li>
+              )}
+              <li>Use Calendar to plan interviews — drag on the calendar to create events quickly.</li>
             </ul>
-            <div className="pt-2">
-              <Button asChild>
+            <div className="pt-2 flex gap-2">
+              <Button asChild size="sm">
                 <Link href="/calendar">Open Calendar</Link>
               </Button>
+              {outbox.length > 0 && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/calendar">View Outbox</Link>
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
-
-
+      </div>
       <Card className="rounded-2xl shadow-md">
         <CardHeader>
           <CardTitle className="text-base">Candidates</CardTitle>
