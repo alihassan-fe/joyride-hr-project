@@ -26,7 +26,7 @@ export async function GET() {
 
 type PostBody = { email?: string; name?: string; role?: string; password?: string }
 
-const ALLOWED_ROLES = new Set(["Admin", "Manager", "HR", "Employee", "Authenticated"])
+const ALLOWED_ROLES = new Set(["Admin", "Manager", "HR", "Employee", "Recruiter", "Viewer", "Authenticated"])
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     if (rows.length === 0) {
       return NextResponse.json({ error: "User already exists" }, { status: 409 })
     }
-    return NextResponse.json(rows[0], { status: 201 })
+    return NextResponse.json({ data: rows[0] }, { status: 201 })
   } catch (e: any) {
     // 23505 unique_violation
     if (e?.code === "23505") {

@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { getSql } from "@/lib/sql"
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const sql = getSql()
-  const rows = await sql/* sql */`
+  const rows = await sql /* sql */`
     SELECT id, name, email, role, start_date, pto_balance
     FROM employees
     WHERE id = ${params.id}::uuid
@@ -15,7 +15,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const sql = getSql()
   const patch = await req.json().catch(() => ({}))
-  const [row] = await sql/* sql */`
+  const [row] = await sql /* sql */`
     UPDATE employees SET
       name = COALESCE(${patch.name}, name),
       email = COALESCE(${patch.email}, email),
@@ -27,4 +27,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   `
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 })
   return NextResponse.json({ data: row })
+}
+
+export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+  const sql = getSql()
+  const rows = await sql /* sql */`
+    DELETE FROM employees
+    WHERE id = ${params.id}::uuid
+    RETURNING id
+  `
+  if (rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  return NextResponse.json({ ok: true })
 }

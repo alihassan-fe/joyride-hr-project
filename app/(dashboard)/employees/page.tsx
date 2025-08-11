@@ -8,18 +8,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import NewEmployeeDialog from "@/components/new-employee-dialog"
+import EditEmployeeDialog, { type EmployeeRow } from "@/components/edit-employee-dialog"
+import { useToast } from "@/hooks/use-toast"
+import { Trash2, Pencil } from "lucide-react"
 
-type Employee = {
-  id: string
-  name: string
-  email: string
-  role: string
-  start_date: string
-}
+type Employee = EmployeeRow
 
 type Broadcast = { id: number; title: string; message: string; created_at: string }
 
 export default function EmployeesPage() {
+  const { toast } = useToast()
   const { data: session } = useSession()
   const isAdmin = (session?.user as any)?.role === "Admin"
 
@@ -28,6 +26,8 @@ export default function EmployeesPage() {
   const [title, setTitle] = useState("")
   const [message, setMessage] = useState("")
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
+  const [editing, setEditing] = useState<Employee | null>(null)
+  const [deleting, setDeleting] = useState<Employee | null>(null)
 
   const fetchEmployees = async () => {
     try {
@@ -40,8 +40,11 @@ export default function EmployeesPage() {
     }
   }
   const fetchBroadcasts = async () => {
-    const res = await fetch("/api/broadcasts")
-    if (res.ok) setBroadcasts(await res.json())
+    // legacy; safe no-op if route removed
+    try {
+      const res = await fetch("/api/broadcasts")
+      if (res.ok) setBroadcasts(await res.json())
+    } catch {}
   }
 
   useEffect(() => {
@@ -50,17 +53,19 @@ export default function EmployeesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const sendBroadcast = async () => {
-    if (!title || !message) return
-    const res = await fetch("/api/broadcasts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, message, created_by: "hr-admin" }),
-    })
-    if (res.ok) {
-      setTitle("")
-      setMessage("")
-      fetchBroadcasts()
+  async function deleteEmployee(id: string) {
+    try {
+      const res = await fetch(`/api/employees/${id}`, { method: "DELETE" })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j?.error || "Failed to delete employee")
+      }
+      toast({ title: "Employee deleted" })
+      setEmployees((prev) => prev.filter((e) => e.id !== id))
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Delete failed" })
+    } finally {
+      setDeleting(null)
     }
   }
 
@@ -100,6 +105,18 @@ export default function EmployeesPage() {
                         <Button variant="outline" size="sm" onClick={() => (window.location.href = "/calendar")}>
                           View Schedule
                         </Button>
+                        {isAdmin && (
+                          <>
+                            <Button variant="outline" size="sm" onClick={() => setEditing(e)}>
+                              <Pencil className="mr-1 h-4 w-4" />
+                              Edit
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => setDeleting(e)}>
+                              <Trash2 className="mr-1 h-4 w-4" />
+                              Delete
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -117,6 +134,7 @@ export default function EmployeesPage() {
         </CardContent>
       </Card>
 
+      {/* Optional legacy broadcasts UI left intact; can be removed later */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="shadow-xl rounded-2xl">
           <CardHeader>
@@ -136,7 +154,7 @@ export default function EmployeesPage() {
               />
             </div>
             <div>
-              <Button onClick={sendBroadcast}>Send</Button>
+              <Button onClick={() => toast({ title: "Broadcast disabled in this build" })}>Send</Button>
             </div>
           </CardContent>
         </Card>
@@ -157,6 +175,35 @@ export default function EmployeesPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit employee dialog */}
+      {editing && (
+        <EditEmployeeDialog
+          employee={editing}
+          onUpdated={fetchEmployees}
+          trigger={<span className="sr-only">Open</span>}
+        />
+      )}
+
+      {/* Delete confirm */}
+      {deleting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-background rounded-lg p-6 w-full max-w-md shadow-lg">
+            <h3 className="text-lg font-medium">Delete employee</h3>
+            <p className="text-sm text-muted-foreground mt-2">
+              Are you sure you want to delete {deleting.name}? This action cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleting(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={() => deleteEmployee(deleting.id)}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
