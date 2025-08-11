@@ -2,11 +2,11 @@ import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { renderEventEmailHTML } from "@/lib/email"
 import { createEventICS } from "@/lib/ics"
-import { sendEventEmail } from "@/lib/mailer"
+import { triggerN8n } from "@/lib/n8n"
 
 export async function POST(req: Request) {
   try {
-    const { event_id, recipients: overrideRecipients, subject: subjectOverride, message } = await req.json()
+    const { event_id, recipients: overrideRecipients, subject: subjectOverride, message, webhookUrl } = await req.json()
 
     if (!event_id) {
       return NextResponse.json({ error: "event_id required" }, { status: 400 })
@@ -52,6 +52,7 @@ export async function POST(req: Request) {
     const subject =
       subjectOverride || (event.type === "interview" ? `Interview: ${event.title}` : `Invitation: ${event.title}`)
 
+    // Optional rendering so your n8n workflow can attach an email/ICS right away
     const html = renderEventEmailHTML({
       title: event.title,
       type: event.type,
@@ -78,63 +79,65 @@ export async function POST(req: Request) {
     const queued = await sql<
       {
         id: number
-        status: string
       }[]
     >`
       INSERT INTO event_notifications (event_id, channel, subject, recipients, payload, status)
-      VALUES (${event.id}, 'email', ${subject}, ${recipients}, ${{
+      VALUES (${event.id}, 'n8n', ${subject}, ${recipients}, ${{
         html,
         ics,
         event,
       }}, 'queued')
-      RETURNING id, status
+      RETURNING id
     `
     const notificationId = queued[0].id
 
-    // 2) Try to send email via provider (Resend or SMTP), otherwise remain queued
-    let providerMsgId: string | null = null
-    let newStatus: "sent" | "failed" | "queued" = "queued"
+    // 2) Trigger n8n webhook (env default or per-request override)
+    const url = webhookUrl || process.env.N8N_WEBHOOK_URL
+    if (!url) {
+      // No webhook configured: stay queued but return success so UI shows it's logged
+      return NextResponse.json(
+        { ok: true, notification: { id: notificationId, status: "queued", message_id: null } },
+        { status: 201 },
+      )
+    }
+
+    const payload = {
+      type: "calendar.invite",
+      source: "joyride-hr",
+      subject,
+      recipients,
+      event,
+      html,
+      ics,
+    }
+
+    let messageId: string | null = null
+    let newStatus: "sent" | "failed" = "sent"
     let errorMsg: string | null = null
 
     try {
-      const result = await sendEventEmail({
-        to: recipients,
-        subject,
-        html,
-        ics,
-      })
-
-      if (result.provider === "noop") {
-        newStatus = "queued" // No provider configured; stays queued for visibility
-      } else {
-        providerMsgId = result.id
-        newStatus = "sent"
+      const result = await triggerN8n(url, payload)
+      messageId = result.id || null
+      if (!result.ok) {
+        newStatus = "failed"
+        errorMsg = result.error || `HTTP ${result.status}`
       }
     } catch (err: any) {
       newStatus = "failed"
       errorMsg = err?.message || String(err)
     }
 
-    // 3) Update Outbox row with result
     await sql`
       UPDATE event_notifications
       SET status = ${newStatus},
-          message_id = ${providerMsgId},
+          message_id = ${messageId},
           error = ${errorMsg},
           sent_at = CASE WHEN ${newStatus} = 'sent' THEN now() ELSE sent_at END
       WHERE id = ${notificationId}
     `
 
     return NextResponse.json(
-      {
-        ok: true,
-        notification: {
-          id: notificationId,
-          status: newStatus,
-          message_id: providerMsgId,
-          error: errorMsg,
-        },
-      },
+      { ok: true, notification: { id: notificationId, status: newStatus, message_id: messageId, error: errorMsg } },
       { status: 201 },
     )
   } catch (e: any) {

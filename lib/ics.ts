@@ -1,63 +1,45 @@
-type ICSParams = {
+type ICSOptions = {
   uid: string
   title: string
   description?: string
   location?: string
-  organizer?: string
-  attendees?: string[]
   startISO: string
   endISO: string
+  organizer: string
+  attendees: string[]
 }
 
-function toICSDate(iso: string) {
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(
-    d.getUTCMinutes(),
-  )}${pad(d.getUTCSeconds())}Z`
+function isoToCal(iso: string) {
+  // Always UTC Z format without milliseconds
+  const z = new Date(iso).toISOString().replace(/\.\d{3}Z$/, "Z")
+  return z.replace(/[-:]/g, "").replace(".000", "")
 }
 
-export function createEventICS(params: ICSParams) {
-  const {
-    uid,
-    title,
-    description = "",
-    location = "",
-    organizer = "hr@company.test",
-    attendees = [],
-    startISO,
-    endISO,
-  } = params
-
-  const dtstamp = toICSDate(new Date().toISOString())
-  const dtstart = toICSDate(startISO)
-  const dtend = toICSDate(endISO)
-
+export function createEventICS(opts: ICSOptions) {
+  const dtStart = isoToCal(opts.startISO)
+  const dtEnd = isoToCal(opts.endISO)
   const lines = [
     "BEGIN:VCALENDAR",
-    "VERSION:2.0",
     "PRODID:-//Joyride HR//Calendar//EN",
+    "VERSION:2.0",
     "CALSCALE:GREGORIAN",
     "METHOD:REQUEST",
     "BEGIN:VEVENT",
-    `UID:${uid}`,
-    `DTSTAMP:${dtstamp}`,
-    `DTSTART:${dtstart}`,
-    `DTEND:${dtend}`,
-    `SUMMARY:${escapeText(title)}`,
-    description ? `DESCRIPTION:${escapeText(description)}` : undefined,
-    location ? `LOCATION:${escapeText(location)}` : undefined,
-    `ORGANIZER:mailto:${organizer}`,
-    ...attendees.map(
-      (a) => `ATTENDEE;CN=${escapeText(a)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${a}`,
-    ),
+    `UID:${opts.uid}`,
+    `DTSTAMP:${isoToCal(new Date().toISOString())}`,
+    `DTSTART:${dtStart}`,
+    `DTEND:${dtEnd}`,
+    `SUMMARY:${escapeText(opts.title)}`,
+    opts.location ? `LOCATION:${escapeText(opts.location)}` : undefined,
+    opts.description ? `DESCRIPTION:${escapeText(opts.description)}` : undefined,
+    `ORGANIZER:${escapeText(opts.organizer)}`,
+    ...opts.attendees.map((a) => `ATTENDEE;CN=${escapeText(a)}:MAILTO:${escapeText(a)}`),
     "END:VEVENT",
     "END:VCALENDAR",
   ].filter(Boolean) as string[]
-
   return lines.join("\r\n")
 }
 
 function escapeText(s: string) {
-  return s.replace(/\\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;")
+  return s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;")
 }

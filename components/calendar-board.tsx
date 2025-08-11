@@ -44,6 +44,8 @@ type OutboxItem = {
     html?: string
     ics?: string
   }
+  message_id?: string | null
+  error?: string | null
 }
 
 function typeBadge(t: EventType) {
@@ -67,6 +69,27 @@ export function CalendarBoard() {
 
   const [outbox, setOutbox] = useState<OutboxItem[]>([])
   const [previewItem, setPreviewItem] = useState<OutboxItem | null>(null)
+
+  // n8n controls
+  const [useN8n, setUseN8n] = useState(true)
+  const [webhookUrl, setWebhookUrl] = useState("")
+
+  useEffect(() => {
+    // Restore UI prefs from localStorage
+    try {
+      const savedUseN8n = localStorage.getItem("calendar_use_n8n")
+      const savedWebhook = localStorage.getItem("calendar_n8n_webhook")
+      if (savedUseN8n != null) setUseN8n(savedUseN8n === "true")
+      if (savedWebhook) setWebhookUrl(savedWebhook)
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("calendar_use_n8n", String(useN8n))
+      if (webhookUrl) localStorage.setItem("calendar_n8n_webhook", webhookUrl)
+    } catch {}
+  }, [useN8n, webhookUrl])
 
   const fetchEvents = useCallback(async (start?: string, end?: string) => {
     try {
@@ -109,7 +132,7 @@ export function CalendarBoard() {
         const data = await res.json()
         setOutbox(data)
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
   }, [])
@@ -273,24 +296,31 @@ export function CalendarBoard() {
       toast({ title: "Save the event first", variant: "destructive" })
       return
     }
+    if (useN8n && !webhookUrl) {
+      toast({ title: "Provide n8n Webhook URL", variant: "destructive" })
+      return
+    }
     const res = await fetch("/api/calendar/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         event_id: draft.id,
-        // optional override recipients via UI inputs:
         recipients: [
           ...(parseCsv(attendeesCsv) || []),
           ...(draft.candidateEmail ? [draft.candidateEmail] : []),
           ...(parseCsv(panelCsv) || []),
         ],
+        // n8n-first approach
+        webhookUrl: useN8n ? webhookUrl : undefined,
       }),
     })
     if (res.ok) {
-      toast({ title: "Invites queued" })
+      const data = await res.json()
+      toast({ title: data.notification?.status === "sent" ? "Workflow triggered" : "Queued" })
       fetchOutbox()
     } else {
-      toast({ title: "Failed to queue invites", variant: "destructive" })
+      const err = await res.json().catch(() => ({}))
+      toast({ title: err?.error || "Failed to trigger", variant: "destructive" })
     }
   }
 
@@ -341,11 +371,11 @@ export function CalendarBoard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Outbox (Latest Notifications)</CardTitle>
+          <CardTitle>Outbox (Latest Activity)</CardTitle>
         </CardHeader>
         <CardContent>
           {outbox.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No notifications yet.</div>
+            <div className="text-sm text-muted-foreground">No activity yet.</div>
           ) : (
             <div className="space-y-2">
               {outbox.map((n) => (
@@ -356,9 +386,11 @@ export function CalendarBoard() {
                   <div className="space-y-1">
                     <div className="text-sm font-medium">{n.subject}</div>
                     <div className="text-xs text-muted-foreground">
-                      Event: {n.event_title} • {new Date(n.created_at).toLocaleString()} • {n.recipients.length}{" "}
-                      recipient
+                      {n.channel.toUpperCase()} • Event: {n.event_title} • {new Date(n.created_at).toLocaleString()} •{" "}
+                      {n.recipients.length} recipient
                       {n.recipients.length !== 1 ? "s" : ""} • {n.status}
+                      {n.message_id ? ` • id: ${n.message_id}` : ""}
+                      {n.error ? ` • error: ${n.error}` : ""}
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -491,6 +523,33 @@ export function CalendarBoard() {
                 </div>
               </>
             )}
+
+            <div className="md:col-span-2 border-t pt-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  id="use-n8n"
+                  type="checkbox"
+                  checked={useN8n}
+                  onChange={(e) => setUseN8n(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="use-n8n">Use n8n workflow for invites</Label>
+              </div>
+              {useN8n && (
+                <div className="space-y-1">
+                  <Label>n8n Webhook URL</Label>
+                  <Input
+                    placeholder="https://n8n.yourdomain.com/webhook/XXXXXXXX"
+                    value={webhookUrl}
+                    onChange={(e) => setWebhookUrl(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Your workflow can send emails, Slack messages, and handle retries. We sign requests with HMAC if you
+                    set N8N_WEBHOOK_SECRET on the server.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter className="gap-2">
             {draft?.id && (
@@ -503,7 +562,7 @@ export function CalendarBoard() {
             </Button>
             <Button onClick={upsertEvent}>{draft?.id ? "Save" : "Create"}</Button>
             <Button variant="secondary" onClick={sendInvites} disabled={!draft?.id}>
-              Send invites
+              Trigger invites
             </Button>
           </DialogFooter>
         </DialogContent>
