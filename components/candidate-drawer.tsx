@@ -151,9 +151,9 @@ export function CandidateDrawer({
                   </Button>
                 ))}
               </div>
-              {candidate.cvLink && (
+              {candidate.cv_link && (
                 <a
-                  href={candidate.cvLink}
+                  href={candidate.cv_link}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center text-sm text-neutral-700 hover:underline my-4"

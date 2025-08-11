@@ -1,11 +1,4 @@
-export type CandidateStatus = "Call Immediatley" | "Remove" | "Shortlist"
-
-export type Job = {
-  id: string
-  title: string
-  description?: string
-  requirements?: string[]
-}
+export type CandidateStatus = "Call Immediatley" | "Remove" | "Shortlist";
 
 export type Candidate = {
 id: number
