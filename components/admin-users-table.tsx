@@ -41,10 +41,14 @@ export default function AdminUsersTable({ initialUsers }: Props) {
   const [editing, setEditing] = useState<UserRow | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const sorted = useMemo(
-    () => [...users].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")),
-    [users],
-  )
+const sorted = useMemo(() => {
+  return [...users].sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return bTime - aTime; // descending order
+  });
+}, [users]);
+
 
   async function handleDelete(id: string) {
     try {

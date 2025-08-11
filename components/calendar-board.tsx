@@ -14,37 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-
-type EventType = "holiday" | "interview" | "meeting"
-type Draft = {
-  id?: number
-  title: string
-  type: EventType
-  start: string
-  end: string
-  allDay: boolean
-  description?: string
-  location?: string
-  attendees?: string[] // general attendees
-  candidateEmail?: string
-  panelEmails?: string[]
-  videoLink?: string
-}
-
-type OutboxItem = {
-  id: number
-  event_id: number
-  channel: string
-  subject: string
-  recipients: string[]
-  status: string
-  created_at: string
-  event_title: string
-  payload?: {
-    html?: string
-    ics?: string
-  }
-}
+import { Draft, EventType, OutboxItem } from "@/lib/types"
 
 function typeBadge(t: EventType) {
   const map: Record<EventType, string> = {
