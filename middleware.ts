@@ -11,6 +11,7 @@ export default withAuth(
         pathname.startsWith("/applicants") || 
         pathname.startsWith("/employees") || 
         pathname.startsWith("/calendar") || 
+        pathname.startsWith("/broadcasts") || 
         pathname.startsWith("/admin")) {
       
       // If no token (not authenticated), redirect to login

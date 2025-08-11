@@ -34,6 +34,7 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<(typeof ROLE_OPTIONS)[number]>("Employee")
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().slice(0, 10))
+  const [pto, setPto] = useState<number>(0)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -68,6 +69,7 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
       setEmail("")
       setRole("Employee")
       setStartDate(new Date().toISOString().slice(0, 10))
+      setPto(0)
       onCreated?.()
     } finally {
       setSubmitting(false)
@@ -83,7 +85,7 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
         <DialogHeader>
           <DialogTitle>Add New Employee</DialogTitle>
           <DialogDescription>
-            {"Create a new employee record with role and start date."}
+            {"Create a new employee record with role, start date, and PTO balance."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">

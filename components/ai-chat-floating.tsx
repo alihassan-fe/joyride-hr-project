@@ -37,7 +37,7 @@ export function AIChatFloating() {
     setLoading(true)
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_WEBHOOK_DOMAIN}/webhook/ai-candidates-query`, {
+      const res = await fetch("https://oriormedia.app.n8n.cloud/webhook/ai-candidates-query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: prompt })

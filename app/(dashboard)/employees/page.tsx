@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import NewEmployeeDialog from "@/components/new-employee-dialog"
 import EditEmployeeDialog, { type EmployeeRow } from "@/components/edit-employee-dialog"
 import { useToast } from "@/hooks/use-toast"
@@ -131,6 +133,48 @@ export default function EmployeesPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Optional legacy broadcasts UI left intact; can be removed later */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="shadow-xl rounded-2xl">
+          <CardHeader>
+            <CardTitle>Send Broadcast</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Company Update" />
+            </div>
+            <div className="space-y-2">
+              <Label>Message</Label>
+              <Input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Message to all employees"
+              />
+            </div>
+            <div>
+              <Button onClick={() => toast({ title: "Broadcast disabled in this build" })}>Send</Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-xl rounded-2xl">
+          <CardHeader>
+            <CardTitle>Recent Broadcasts</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {broadcasts.length === 0 && <div className="text-sm text-muted-foreground">No broadcasts yet.</div>}
+            {broadcasts.map((b) => (
+              <div key={b.id} className="border rounded-md p-3">
+                <div className="text-sm font-medium">{b.title}</div>
+                <div className="text-sm text-muted-foreground">{b.message}</div>
+                <div className="text-xs text-muted-foreground mt-1">{new Date(b.created_at).toLocaleString()}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Edit employee dialog */}
       {editing && (

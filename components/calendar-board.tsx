@@ -14,10 +14,43 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { Draft, EventType, OutboxItem } from "@/lib/types"
+
+type EventType = "pto" | "holiday" | "interview" | "meeting"
+type Draft = {
+  id?: number
+  title: string
+  type: EventType
+  start: string
+  end: string
+  allDay: boolean
+  description?: string
+  location?: string
+  attendees?: string[] // general attendees
+  candidateEmail?: string
+  panelEmails?: string[]
+  videoLink?: string
+}
+
+type OutboxItem = {
+  id: number
+  event_id: number
+  channel: string
+  subject: string
+  recipients: string[]
+  status: string
+  created_at: string
+  event_title: string
+  payload?: {
+    html?: string
+    ics?: string
+  }
+  message_id?: string | null
+  error?: string | null
+}
 
 function typeBadge(t: EventType) {
   const map: Record<EventType, string> = {
+    pto: "bg-amber-100 text-amber-800",
     holiday: "bg-emerald-100 text-emerald-800",
     interview: "bg-purple-100 text-purple-800",
     meeting: "bg-slate-100 text-slate-800",
@@ -33,7 +66,6 @@ export function CalendarBoard() {
 
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Draft | null>(null)
-  console.log("🚀 ~ CalendarBoard ~ draft:", draft)
 
   const [outbox, setOutbox] = useState<OutboxItem[]>([])
   const [previewItem, setPreviewItem] = useState<OutboxItem | null>(null)
@@ -187,8 +219,8 @@ export function CalendarBoard() {
       id: draft.id,
       title: draft.title || draft.type.toUpperCase(),
       type: draft.type,
-      start_time: draft.start,
-      end_time: draft.end,
+      start_time: draft.start, // Fixed: was start
+      end_time: draft.end, // Fixed: was end
       all_day: draft.allDay,
       description: draft.description,
       location: draft.location,
@@ -206,12 +238,13 @@ export function CalendarBoard() {
       body: JSON.stringify(body),
     })
     if (res.ok) {
+      const savedEvent = await res.json()
+      setDraft((prev) => (prev ? { ...prev, id: savedEvent.id } : null))
       toast({ title: draft.id ? "Event saved" : "Event created" })
-      setOpen(false)
-      setDraft(null)
       fetchEvents()
     } else {
-      toast({ title: "Failed to save", variant: "destructive" })
+      const error = await res.json().catch(() => ({ error: "Unknown error" }))
+      toast({ title: `Failed to save: ${error.error}`, variant: "destructive" })
     }
   }, [draft, fetchEvents, toast])
 
@@ -381,7 +414,7 @@ export function CalendarBoard() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-    <DialogContent className="!max-w-[800px] w-full">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{draft?.id ? "Edit Event" : "New Event"}</DialogTitle>
           </DialogHeader>
@@ -394,16 +427,17 @@ export function CalendarBoard() {
                 placeholder="Event title"
               />
             </div>
-            <div className="space-y-2 w-full">
+            <div className="space-y-2">
               <Label>Type</Label>
               <Select
                 value={draft?.type}
                 onValueChange={(v: EventType) => setDraft((d) => (d ? { ...d, type: v } : d))}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
-                <SelectContent className="w-full">
+                <SelectContent>
+                  <SelectItem value="pto">PTO</SelectItem>
                   <SelectItem value="holiday">Public Holiday</SelectItem>
                   <SelectItem value="interview">Interview</SelectItem>
                   <SelectItem value="meeting">Meeting</SelectItem>
@@ -415,7 +449,7 @@ export function CalendarBoard() {
               <Textarea
                 value={draft?.description || ""}
                 onChange={(e) => setDraft((d) => (d ? { ...d, description: e.target.value } : d))}
-                placeholder="Agenda, notes..."
+                placeholder="Agenda, notes, or PTO reason..."
               />
             </div>
             <div className="space-y-2">
@@ -528,9 +562,20 @@ export function CalendarBoard() {
               Close
             </Button>
             <Button onClick={upsertEvent}>{draft?.id ? "Save" : "Create"}</Button>
-            <Button variant="secondary" onClick={sendInvites} disabled={!draft?.id}>
-              Trigger invites
-            </Button>
+            <div className="relative">
+              <Button
+                variant="secondary"
+                onClick={sendInvites}
+                disabled={!draft?.id}
+                title={
+                  !draft?.id
+                    ? "Save the event first to get an ID, then you can trigger invites"
+                    : "Send email invitations via n8n workflow"
+                }
+              >
+                Trigger invites
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

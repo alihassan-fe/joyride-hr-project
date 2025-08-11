@@ -223,7 +223,7 @@ export default function ApplicantsPage() {
                         {typeof c.operationsManager === "number" ? c.operationsManager : "-"}
                       </TableCell>
                                             <TableCell className="min-w-[120px] whitespace-nowrap">
-                        <RecommendationBadge value={c.recommendation ?? ""} />
+                        <RecommendationBadge value={c.recommendation} />
                       </TableCell>
                       <TableCell className="min-w-[80px] whitespace-nowrap">
                         {c.cvLink ? (
