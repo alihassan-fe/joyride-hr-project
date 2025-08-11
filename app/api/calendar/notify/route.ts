@@ -6,10 +6,10 @@ import { triggerN8n } from "@/lib/n8n"
 
 export async function POST(req: Request) {
   try {
-    const { event_id, recipients: overrideRecipients, subject: subjectOverride, message, webhookUrl } = await req.json()
+    const { eventId, recipients: overrideRecipients, subject: subjectOverride, message, webhookUrl } = await req.json()
 
-    if (!event_id) {
-      return NextResponse.json({ error: "event_id required" }, { status: 400 })
+    if (!eventId) {
+      return NextResponse.json({ error: "eventId required" }, { status: 400 })
     }
 
     const rows = await sql<
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
              to_char(end_time   AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') as end_time,
              COALESCE(meta,'{}'::jsonb) as meta
       FROM calendar_events
-      WHERE id = ${event_id}
+      WHERE id = ${eventId}
       LIMIT 1
     `
     const event = rows[0]
@@ -91,14 +91,8 @@ export async function POST(req: Request) {
     `
     const notificationId = queued[0].id
 
-    // 2) Trigger n8n webhook (env default or per-request override)
-    const url = webhookUrl || process.env.N8N_WEBHOOK_URL
-    if (!url) {
-      // No webhook configured: stay queued but return success so UI shows it's logged
-      return NextResponse.json(
-        { ok: true, notification: { id: notificationId, status: "queued", message_id: null } },
-        { status: 201 },
-      )
+    if (!webhookUrl) {
+      return NextResponse.json({ error: "n8n webhook URL is required" }, { status: 400 })
     }
 
     const payload = {
@@ -116,7 +110,7 @@ export async function POST(req: Request) {
     let errorMsg: string | null = null
 
     try {
-      const result = await triggerN8n(url, payload)
+      const result = await triggerN8n(webhookUrl, payload)
       messageId = result.id || null
       if (!result.ok) {
         newStatus = "failed"
