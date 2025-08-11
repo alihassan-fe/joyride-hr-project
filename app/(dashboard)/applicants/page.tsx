@@ -22,12 +22,9 @@ import {
 } from "@/components/ui/select"
 import { Candidate } from "@/lib/types"
 
-
-// Use the same webhook as the Dashboard
-const WEBHOOK_URL = `${process.env.NEXT_PUBLIC_WEBHOOK_DOMAIN}/webhook/candidates`
-
 export default function ApplicantsPage() {
   const [data, setData] = useState<Candidate[]>([])
+  console.log("data", data)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>("")
   const [recommendationFilter, setRecommendationFilter] = useState<string>("all")
@@ -39,21 +36,14 @@ export default function ApplicantsPage() {
 
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
-  const PAGE_SIZE = 10
+  const PAGE_SIZE = 12
 
   async function fetchData() {
-    setLoading(true)
-    setError("")
-    try {
-      const res = await fetch(WEBHOOK_URL, { cache: "no-store" })
-      if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`)
-      const json = (await res.json()) as Candidate[] | { data: Candidate[] }
-      const arr = Array.isArray(json) ? json : (json as any).data
-      if (!Array.isArray(arr)) throw new Error("Unexpected response shape")
-      setData(arr.length > 0 ? arr : [])
-    } catch (e: any) {
-      setError(e.message || "Failed to fetch applicants")
-      setData([])
+  try {
+      setLoading(true)
+      const res = await fetch("/api/candidates")
+      const data = await res.json()
+      setData(data?.data ?? [])
     } finally {
       setLoading(false)
     }
@@ -220,15 +210,15 @@ export default function ApplicantsPage() {
                         {typeof c.dispatch === "number" ? c.dispatch : "-"}
                       </TableCell>
                       <TableCell className="min-w-[100px] whitespace-nowrap">
-                        {typeof c.operationsManager === "number" ? c.operationsManager : "-"}
+                        {typeof c.operations_manager === "number" ? c.operations_manager : "-"}
                       </TableCell>
                                             <TableCell className="min-w-[120px] whitespace-nowrap">
                         <RecommendationBadge value={c.recommendation ?? ""} />
                       </TableCell>
                       <TableCell className="min-w-[80px] whitespace-nowrap">
-                        {c.cvLink ? (
+                        {c.cv_link ? (
                           <a
-                            href={c.cvLink}
+                            href={c.cv_link}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center text-sm text-neutral-700 hover:underline"

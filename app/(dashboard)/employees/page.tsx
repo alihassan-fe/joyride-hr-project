@@ -12,8 +12,6 @@ import { Trash2, Pencil } from "lucide-react"
 
 type Employee = EmployeeRow
 
-type Broadcast = { id: number; title: string; message: string; created_at: string }
-
 export default function EmployeesPage() {
   const { toast } = useToast()
   const { data: session } = useSession()
@@ -21,9 +19,6 @@ export default function EmployeesPage() {
 
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
-  const [title, setTitle] = useState("")
-  const [message, setMessage] = useState("")
-  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
   const [editing, setEditing] = useState<Employee | null>(null)
   const [deleting, setDeleting] = useState<Employee | null>(null)
 
@@ -37,17 +32,9 @@ export default function EmployeesPage() {
       setLoading(false)
     }
   }
-  const fetchBroadcasts = async () => {
-    // legacy; safe no-op if route removed
-    try {
-      const res = await fetch("/api/broadcasts")
-      if (res.ok) setBroadcasts(await res.json())
-    } catch {}
-  }
 
   useEffect(() => {
     fetchEmployees()
-    fetchBroadcasts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -136,6 +123,8 @@ export default function EmployeesPage() {
       {editing && (
         <EditEmployeeDialog
           employee={editing}
+          open={!!editing}
+          onOpenChange={(open) => !open && setEditing(null)}
           onUpdated={fetchEmployees}
           trigger={<span className="sr-only">Open</span>}
         />

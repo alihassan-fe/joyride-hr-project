@@ -1,97 +1,102 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin from "@fullcalendar/interaction"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Trash2, Download } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { Draft, EventType, OutboxItem } from "@/lib/types"
 
-function typeBadge(t: EventType) {
-  const map: Record<EventType, string> = {
-    holiday: "bg-emerald-100 text-emerald-800",
-    interview: "bg-purple-100 text-purple-800",
-    meeting: "bg-slate-100 text-slate-800",
-  }
-  return map[t]
+type EventType = "pto" | "holiday" | "interview"
+
+type CalendarEvent = {
+  id?: number
+  title: string
+  type: EventType
+  start: string
+  end: string
+  allDay?: boolean
+  description?: string
+  location?: string
+  attendees?: string
+  candidateEmail?: string
+  panelEmails?: string
+  videoLink?: string
 }
 
-export function CalendarBoard() {
-  const { toast } = useToast()
+type OutboxEntry = {
+  id: number
+  event_id: number
+  subject: string
+  recipients: string[]
+  status: string
+  created_at: string
+  sent_at?: string
+  error?: string
+  payload: {
+    html: string
+    ics: string
+    event: any
+  }
+}
+
+const parseCsv = (str: string): string[] => {
+  return str
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+export default function CalendarBoard() {
   const [events, setEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState<Draft | null>(null)
-  console.log("🚀 ~ CalendarBoard ~ draft:", draft)
-
-  const [outbox, setOutbox] = useState<OutboxItem[]>([])
-  const [previewItem, setPreviewItem] = useState<OutboxItem | null>(null)
-
-  // n8n controls
-  const [useN8n, setUseN8n] = useState(true)
-  const [webhookUrl, setWebhookUrl] = useState("")
-
-  useEffect(() => {
-    // Restore UI prefs from localStorage
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [draft, setDraft] = useState<CalendarEvent | null>(null)
+  const [outbox, setOutbox] = useState<OutboxEntry[]>([])
+  const { toast } = useToast()
+  const webhookUrl = process.env.N8N_WEBHOOK_URL || "https://oriormedia.app.n8n.cloud/webhook/calender-invite"
+  const fetchEvents = useCallback(async () => {
     try {
-      const savedUseN8n = localStorage.getItem("calendar_use_n8n")
-      const savedWebhook = localStorage.getItem("calendar_n8n_webhook")
-      if (savedUseN8n != null) setUseN8n(savedUseN8n === "true")
-      if (savedWebhook) setWebhookUrl(savedWebhook)
-    } catch {}
-  }, [])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("calendar_use_n8n", String(useN8n))
-      if (webhookUrl) localStorage.setItem("calendar_n8n_webhook", webhookUrl)
-    } catch {}
-  }, [useN8n, webhookUrl])
-
-  const fetchEvents = useCallback(async (start?: string, end?: string) => {
-    try {
-      setLoading(true)
-      const url = new URL("/api/calendar/events", window.location.origin)
-      if (start && end) {
-        url.searchParams.set("start", start)
-        url.searchParams.set("end", end)
-      }
-      const res = await fetch(url.toString())
-      if (!res.ok) throw new Error(`Failed: ${res.status}`)
+      const res = await fetch("/api/calendar/events")
+      if (!res.ok) throw new Error("Failed to fetch events")
       const data = await res.json()
-      setEvents(
-        data.map((e: any) => ({
-          id: e.id,
-          title: e.title,
-          start: e.start_time,
-          end: e.end_time,
-          allDay: e.all_day,
-          extendedProps: {
-            type: e.type as EventType,
-            description: e.description || "",
-            location: e.location || "",
-            meta: e.meta || {},
-          },
-        })),
-      )
-      setError(null)
-    } catch (e: any) {
-      setError(e.message)
+
+      const formattedEvents = data.map((event: any) => ({
+        id: event.id,
+        title: event.title,
+        start: event.start_time,
+        end: event.end_time,
+        allDay: event.all_day,
+        backgroundColor: getEventColor(event.type),
+        borderColor: getEventColor(event.type),
+        extendedProps: {
+          type: event.type,
+          description: event.description,
+          location: event.location,
+          meta: event.meta || {},
+        },
+      }))
+
+      setEvents(formattedEvents)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [toast])
 
   const fetchOutbox = useCallback(async () => {
     try {
@@ -100,8 +105,8 @@ export function CalendarBoard() {
         const data = await res.json()
         setOutbox(data)
       }
-    } catch {
-      // ignore
+    } catch (error) {
+      console.error("Failed to fetch outbox:", error)
     }
   }, [])
 
@@ -110,454 +115,447 @@ export function CalendarBoard() {
     fetchOutbox()
   }, [fetchEvents, fetchOutbox])
 
-  const eventContent = useCallback((arg: any) => {
-    const t: EventType = arg.event.extendedProps?.type
-    return {
-      html: `<div class="px-1 py-0.5 rounded ${typeBadge(t)}">
-        <span class="text-[10px] uppercase">${t}</span>
-        <span class="ml-1 text-xs">${arg.timeText ? arg.timeText : ""} ${arg.event.title}</span>
-      </div>`,
+  const getEventColor = (type: EventType) => {
+    switch (type) {
+      case "pto":
+        return "#f59e0b"
+      case "holiday":
+        return "#ef4444"
+      case "interview":
+        return "#3b82f6"
+      default:
+        return "#6b7280"
     }
-  }, [])
+  }
 
-  const handleSelect = useCallback((arg: any) => {
-    setDraft({
+  const handleSelect = (selectInfo: any) => {
+    const newEvent: CalendarEvent = {
       title: "",
-      type: "meeting",
-      start: arg.startStr,
-      end: arg.endStr,
-      allDay: arg.allDay,
-      description: "",
-      location: "",
-      attendees: [],
-      candidateEmail: "",
-      panelEmails: [],
-      videoLink: "",
-    })
-    setOpen(true)
-  }, [])
+      type: "interview",
+      start: selectInfo.startStr,
+      end: selectInfo.endStr,
+      allDay: selectInfo.allDay,
+    }
+    setDraft(newEvent)
+    setDialogOpen(true)
+  }
 
-  const handleEventClick = useCallback((info: any) => {
-    const meta = info.event.extendedProps?.meta || {}
+  const handleEventClick = (clickInfo: any) => {
+    const event = clickInfo.event
+    const meta = event.extendedProps.meta || {}
+
     setDraft({
-      id: Number(info.event.id),
-      title: info.event.title,
-      type: info.event.extendedProps.type,
-      start: info.event.start?.toISOString() || "",
-      end: info.event.end?.toISOString() || "",
-      allDay: info.event.allDay,
-      description: info.event.extendedProps?.description || "",
-      location: info.event.extendedProps?.location || "",
-      attendees: Array.isArray(meta.attendees) ? meta.attendees : [],
+      id: Number.parseInt(event.id),
+      title: event.title,
+      type: event.extendedProps.type,
+      start: event.startStr,
+      end: event.endStr,
+      allDay: event.allDay,
+      description: event.extendedProps.description || "",
+      location: event.extendedProps.location || "",
+      attendees: Array.isArray(meta.attendees) ? meta.attendees.join(", ") : "",
       candidateEmail: meta.candidateEmail || "",
-      panelEmails: Array.isArray(meta.panelEmails) ? meta.panelEmails : [],
+      panelEmails: Array.isArray(meta.panelEmails) ? meta.panelEmails.join(", ") : "",
       videoLink: meta.videoLink || "",
     })
-    setOpen(true)
-  }, [])
+    setDialogOpen(true)
+  }
 
-  const handleEventDropOrResize = useCallback(
-    async (info: any) => {
-      try {
-        const payload = {
-          id: Number(info.event.id),
-          start_time: info.event.start?.toISOString(),
-          end_time: info.event.end?.toISOString(),
-          all_day: info.event.allDay,
-        }
-        const res = await fetch("/api/calendar/events", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-        if (!res.ok) throw new Error("Failed to update")
-        toast({ title: "Event updated" })
-      } catch (e) {
-        console.error(e)
-        info.revert()
-        toast({ title: "Update failed", variant: "destructive" })
-      }
-    },
-    [toast],
-  )
+  const handleEventDrop = async (dropInfo: any) => {
+    try {
+      const event = dropInfo.event
+      await fetch("/api/calendar/events", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: Number.parseInt(event.id),
+          start_time: event.startStr,
+          end_time: event.endStr,
+        }),
+      })
 
-  const upsertEvent = useCallback(async () => {
-    if (!draft) return
-    const body = {
-      id: draft.id,
-      title: draft.title || draft.type.toUpperCase(),
-      type: draft.type,
-      start_time: draft.start,
-      end_time: draft.end,
-      all_day: draft.allDay,
-      description: draft.description,
-      location: draft.location,
-      meta: {
-        attendees: (draft.attendees || []).filter(Boolean),
+      toast({
+        title: "Success",
+        description: "Event updated successfully",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+      dropInfo.revert()
+    }
+  }
+
+  const upsertEvent = async () => {
+    if (!draft?.title.trim()) {
+      toast({
+        title: "Error",
+        description: "Title is required",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const meta = {
+        attendees: draft.attendees ? parseCsv(draft.attendees) : [],
         candidateEmail: draft.candidateEmail || undefined,
-        panelEmails: (draft.panelEmails || []).filter(Boolean),
+        panelEmails: draft.panelEmails ? parseCsv(draft.panelEmails) : [],
         videoLink: draft.videoLink || undefined,
-      },
-    }
-    const method = draft.id ? "PUT" : "POST"
-    const res = await fetch("/api/calendar/events", {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    })
-    if (res.ok) {
-      toast({ title: draft.id ? "Event saved" : "Event created" })
-      setOpen(false)
-      setDraft(null)
-      fetchEvents()
-    } else {
-      toast({ title: "Failed to save", variant: "destructive" })
-    }
-  }, [draft, fetchEvents, toast])
+      }
 
-  const handleDelete = useCallback(async () => {
+      const payload = {
+        id: draft.id,
+        title: draft.title,
+        type: draft.type,
+        start_time: draft.start,
+        end_time: draft.end,
+        all_day: draft.allDay || false,
+        description: draft.description || null,
+        location: draft.location || null,
+        meta,
+      }
+
+      const method = draft.id ? "PUT" : "POST"
+      const res = await fetch("/api/calendar/events", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || "Failed to save event")
+      }
+
+      const savedEvent = await res.json()
+
+      // Update draft with the saved event ID
+      setDraft((prev) => (prev ? { ...prev, id: savedEvent.id } : null))
+
+      await fetchEvents()
+      toast({
+        title: "Success",
+        description: draft.id ? "Event updated successfully" : "Event created successfully",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const deleteEvent = async () => {
     if (!draft?.id) return
-    const confirmDelete = window.confirm(`Delete "${draft.title}"?`)
-    if (!confirmDelete) return
-    const res = await fetch(`/api/calendar/events?id=${draft.id}`, { method: "DELETE" })
-    if (res.ok) {
-      toast({ title: "Event deleted" })
-      setOpen(false)
+
+    try {
+      const res = await fetch(`/api/calendar/events?id=${draft.id}`, {
+        method: "DELETE",
+      })
+
+      if (!res.ok) throw new Error("Failed to delete event")
+
+      await fetchEvents()
+      setDialogOpen(false)
       setDraft(null)
-      fetchEvents()
-    } else {
-      toast({ title: "Failed to delete", variant: "destructive" })
+      toast({
+        title: "Success",
+        description: "Event deleted successfully",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
     }
-  }, [draft, fetchEvents, toast])
-
-  const headerToolbar = useMemo(
-    () => ({ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay" }),
-    [],
-  )
-
-  const [attendeesCsv, setAttendeesCsv] = useState("")
-  const [panelCsv, setPanelCsv] = useState("")
-
-  useEffect(() => {
-    if (draft) {
-      setAttendeesCsv((draft.attendees || []).join(", "))
-      setPanelCsv((draft.panelEmails || []).join(", "))
-    } else {
-      setAttendeesCsv("")
-      setPanelCsv("")
-    }
-  }, [draft])
-
-  const parseCsv = (s: string) =>
-    s
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean)
-
-  const generateVideoLink = () => {
-    const id = Math.random().toString(36).slice(2, 8)
-    setDraft((d) => (d ? { ...d, videoLink: `https://meet.google.com/lookup/${id}` } : d))
   }
 
   const sendInvites = async () => {
+    console.log("Sending invites...")
     if (!draft?.id) {
-      toast({ title: "Save the event first", variant: "destructive" })
-      return
+      console.log("first")
+      toast({
+        title: "Error",
+        description: "Please save the event first",
+        variant: "destructive",
+      })
+      return console.log("first")
     }
-    if (useN8n && !webhookUrl) {
-      toast({ title: "Provide n8n Webhook URL", variant: "destructive" })
-      return
-    }
-    const res = await fetch("/api/calendar/notify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        event_id: draft.id,
-        recipients: [
-          ...(parseCsv(attendeesCsv) || []),
-          ...(draft.candidateEmail ? [draft.candidateEmail] : []),
-          ...(parseCsv(panelCsv) || []),
-        ],
-        // n8n-first approach
-        webhookUrl: useN8n ? webhookUrl : undefined,
-      }),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      toast({ title: data.notification?.status === "sent" ? "Workflow triggered" : "Queued" })
-      fetchOutbox()
-    } else {
-      const err = await res.json().catch(() => ({}))
-      toast({ title: err?.error || "Failed to trigger", variant: "destructive" })
+
+    try {
+      const recipients = [
+        ...(draft.attendees ? parseCsv(draft.attendees) : []),
+        ...(draft.candidateEmail ? [draft.candidateEmail] : []),
+        ...(draft.panelEmails ? parseCsv(draft.panelEmails) : []),
+      ].filter(Boolean)
+
+      if (recipients.length === 0) {
+          console.log("third")
+        toast({
+          title: "Error",
+          description: "No recipients found. Add attendees, candidate email, or panel emails.",
+          variant: "destructive",
+        })
+        return   console.log("third")
+      }
+
+      const res = await fetch("/api/calendar/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id: draft.id,
+          recipients,
+          webhookUrl,
+        }),
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || "Failed to send invites")
+      }
+
+      await fetchOutbox()
+      toast({
+        title: "Success",
+        description: "Invites sent successfully",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      })
+        console.log("error", error)
     }
   }
 
-  const downloadIcs = (item: OutboxItem) => {
-    const ics = item.payload?.ics
+  const generateVideoLink = () => {
+    if (!draft) return
+    const meetingId = Math.random().toString(36).substring(2, 15)
+    setDraft({ ...draft, videoLink: `https://meet.joyride-hr.com/${meetingId}` })
+  }
+
+  const downloadICS = (entry: OutboxEntry) => {
+    const ics = entry.payload?.ics
     if (!ics) return
-    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" })
+
+    const blob = new Blob([ics], { type: "text/calendar" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `event-${item.event_id}.ics`
+    a.download = `event-${entry.event_id}.ics`
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
 
   return (
     <div className="space-y-6">
-      <Card className="shadow-xl rounded-2xl">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>HR Calendar</CardTitle>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => fetchEvents()}>
-              Refresh
-            </Button>
-            {loading && <Badge variant="secondary">Loading...</Badge>}
-            {error && <Badge variant="destructive">Failed to load</Badge>}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            headerToolbar={headerToolbar}
-            selectable
-            editable
-            droppable={false}
-            eventResizableFromStart
-            events={events}
-            select={handleSelect}
-            eventContent={eventContent}
-            eventDrop={handleEventDropOrResize}
-            eventResize={handleEventDropOrResize}
-            eventClick={handleEventClick}
-            height="auto"
-          />
-        </CardContent>
-      </Card>
-
+      {/* Calendar */}
       <Card>
-        <CardHeader>
-          <CardTitle>Outbox (Latest Activity)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {outbox.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No activity yet.</div>
-          ) : (
-            <div className="space-y-2">
-              {outbox.map((n) => (
-                <div
-                  key={n.id}
-                  className="flex flex-col md:flex-row md:items-center justify-between gap-2 border rounded-md p-3"
-                >
-                  <div className="space-y-1">
-                    <div className="text-sm font-medium">{n.subject}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {n.channel.toUpperCase()} • Event: {n.event_title} • {new Date(n.created_at).toLocaleString()} •{" "}
-                      {n.recipients.length} recipient
-                      {n.recipients.length !== 1 ? "s" : ""} • {n.status}
-                      {n.message_id ? ` • id: ${n.message_id}` : ""}
-                      {n.error ? ` • error: ${n.error}` : ""}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {n.payload?.html && (
-                      <Button size="sm" variant="outline" onClick={() => setPreviewItem(n)}>
-                        Preview Email
-                      </Button>
-                    )}
-                    {n.payload?.ics && (
-                      <Button size="sm" variant="outline" onClick={() => downloadIcs(n)}>
-                        Download ICS
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+            <CardHeader >
+                    <CardTitle>Calender</CardTitle>
+                    <p className="text-sm text-muted-foreground">{"Manage your Schedule"}</p>
+                </CardHeader>
+        <CardContent className="p-6">
+          {loading ? (
+            <div className="flex items-center justify-center h-96">
+              <div className="text-muted-foreground">Loading calendar...</div>
             </div>
+          ) : (
+            <FullCalendar
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              headerToolbar={{
+                left: "prev,next today",
+                center: "title",
+                right: "dayGridMonth,timeGridWeek,timeGridDay",
+              }}
+              initialView="dayGridMonth"
+              editable={true}
+              selectable={true}
+              selectMirror={true}
+              dayMaxEvents={true}
+              weekends={true}
+              events={events}
+              select={handleSelect}
+              eventClick={handleEventClick}
+              eventDrop={handleEventDrop}
+              eventResize={handleEventDrop}
+              height="auto"
+            />
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-    <DialogContent className="!max-w-[800px] w-full">
-          <DialogHeader>
-            <DialogTitle>{draft?.id ? "Edit Event" : "New Event"}</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Outbox */}
+      {outbox.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Notifications</CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="space-y-2">
-              <Label>Title</Label>
-              <Input
-                value={draft?.title || ""}
-                onChange={(e) => setDraft((d) => d && { ...d, title: e.target.value })}
-                placeholder="Event title"
-              />
-            </div>
-            <div className="space-y-2 w-full">
-              <Label>Type</Label>
-              <Select
-                value={draft?.type}
-                onValueChange={(v: EventType) => setDraft((d) => (d ? { ...d, type: v } : d))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent className="w-full">
-                  <SelectItem value="holiday">Public Holiday</SelectItem>
-                  <SelectItem value="interview">Interview</SelectItem>
-                  <SelectItem value="meeting">Meeting</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Description</Label>
-              <Textarea
-                value={draft?.description || ""}
-                onChange={(e) => setDraft((d) => (d ? { ...d, description: e.target.value } : d))}
-                placeholder="Agenda, notes..."
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Start</Label>
-              <Input
-                type="datetime-local"
-                value={draft?.start ? draft.start.slice(0, 16) : ""}
-                onChange={(e) => setDraft((d) => (d ? { ...d, start: new Date(e.target.value).toISOString() } : d))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>End</Label>
-              <Input
-                type="datetime-local"
-                value={draft?.end ? draft.end.slice(0, 16) : ""}
-                onChange={(e) => setDraft((d) => (d ? { ...d, end: new Date(e.target.value).toISOString() } : d))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Location</Label>
-              <Input
-                value={draft?.location || ""}
-                onChange={(e) => setDraft((d) => (d ? { ...d, location: e.target.value } : d))}
-                placeholder="Office HQ, Zoom, Meet..."
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Attendees (comma separated emails)</Label>
-              <Input
-                value={attendeesCsv}
-                onChange={(e) => {
-                  setAttendeesCsv(e.target.value)
-                  setDraft((d) => (d ? { ...d, attendees: parseCsv(e.target.value) } : d))
-                }}
-                placeholder="jane@co.com, john@co.com"
-              />
-            </div>
-
-            {draft?.type === "interview" && (
-              <>
-                <div className="space-y-2">
-                  <Label>Candidate email</Label>
-                  <Input
-                    value={draft?.candidateEmail || ""}
-                    onChange={(e) => setDraft((d) => (d ? { ...d, candidateEmail: e.target.value } : d))}
-                    placeholder="candidate@example.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Interview Panel (comma separated emails)</Label>
-                  <Input
-                    value={panelCsv}
-                    onChange={(e) => {
-                      setPanelCsv(e.target.value)
-                      setDraft((d) => (d ? { ...d, panelEmails: parseCsv(e.target.value) } : d))
-                    }}
-                    placeholder="lead@co.com, hr@co.com"
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Video Conference Link</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={draft?.videoLink || ""}
-                      onChange={(e) => setDraft((d) => (d ? { ...d, videoLink: e.target.value } : d))}
-                      placeholder="https://meet.google.com/..."
-                    />
-                    <Button type="button" variant="outline" onClick={generateVideoLink}>
-                      Generate
+              {outbox.slice(0, 5).map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between p-3 border rounded">
+                  <div className="flex-1">
+                    <div className="font-medium">{entry.subject}</div>
+                    <div className="text-sm text-muted-foreground">
+                      To: {entry.recipients.join(", ")} • {new Date(entry.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={
+                        entry.status === "sent" ? "default" : entry.status === "failed" ? "destructive" : "secondary"
+                      }
+                    >
+                      {entry.status}
+                    </Badge>
+                    <Button variant="ghost" size="sm" onClick={() => downloadICS(entry)} disabled={!entry.payload?.ics}>
+                      <Download className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-              </>
-            )}
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-            <div className="md:col-span-2 border-t pt-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  id="use-n8n"
-                  type="checkbox"
-                  checked={useN8n}
-                  onChange={(e) => setUseN8n(e.target.checked)}
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="use-n8n">Use n8n workflow for invites</Label>
-              </div>
-              {useN8n && (
-                <div className="space-y-1">
-                  <Label>n8n Webhook URL</Label>
+      {/* Event Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="!max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{draft?.id ? "Edit Event" : "Create Event"}</DialogTitle>
+          </DialogHeader>
+
+          {draft && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="title">Title *</Label>
                   <Input
-                    placeholder="https://n8n.yourdomain.com/webhook/XXXXXXXX"
-                    value={webhookUrl}
-                    onChange={(e) => setWebhookUrl(e.target.value)}
+                    id="title"
+                    value={draft.title}
+                    onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                    placeholder="Event title"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Your workflow can send emails, Slack messages, and handle retries. We sign requests with HMAC if you
-                    set N8N_WEBHOOK_SECRET on the server.
-                  </p>
                 </div>
+                <div>
+                  <Label htmlFor="type">Type</Label>
+                  <Select value={draft.type} onValueChange={(value: EventType) => setDraft({ ...draft, type: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="interview">Interview</SelectItem>
+                      <SelectItem value="pto">PTO</SelectItem>
+                      <SelectItem value="holiday">Holiday</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={draft.description || ""}
+                  onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                  placeholder="Event description"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  id="location"
+                  value={draft.location || ""}
+                  onChange={(e) => setDraft({ ...draft, location: e.target.value })}
+                  placeholder="Meeting location or video link"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="attendees">Attendees (comma-separated emails)</Label>
+                <Input
+                  id="attendees"
+                  value={draft.attendees || ""}
+                  onChange={(e) => setDraft({ ...draft, attendees: e.target.value })}
+                  placeholder="john@company.com, jane@company.com"
+                />
+              </div>
+
+              {draft.type === "interview" && (
+                <>
+                  <div>
+                    <Label htmlFor="candidateEmail">Candidate Email</Label>
+                    <Input
+                      id="candidateEmail"
+                      value={draft.candidateEmail || ""}
+                      onChange={(e) => setDraft({ ...draft, candidateEmail: e.target.value })}
+                      placeholder="candidate@email.com"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="panelEmails">Panel Emails (comma-separated)</Label>
+                    <Input
+                      id="panelEmails"
+                      value={draft.panelEmails || ""}
+                      onChange={(e) => setDraft({ ...draft, panelEmails: e.target.value })}
+                      placeholder="interviewer1@company.com, interviewer2@company.com"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="videoLink">Video Link</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="videoLink"
+                        value={draft.videoLink || ""}
+                        onChange={(e) => setDraft({ ...draft, videoLink: e.target.value })}
+                        placeholder="https://meet.google.com/abc-def-ghi"
+                      />
+                      <Button type="button" variant="outline" onClick={generateVideoLink}>
+                        Generate
+                      </Button>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
-          </div>
-          <DialogFooter className="gap-2">
-            {draft?.id && (
-              <Button variant="destructive" onClick={handleDelete}>
-                Delete
-              </Button>
-            )}
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Close
-            </Button>
-            <Button onClick={upsertEvent}>{draft?.id ? "Save" : "Create"}</Button>
-            <Button variant="secondary" onClick={sendInvites} disabled={!draft?.id}>
-              Trigger invites
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          )}
 
-      <Dialog open={!!previewItem} onOpenChange={(o) => !o && setPreviewItem(null)}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{previewItem?.subject || "Email Preview"}</DialogTitle>
-          </DialogHeader>
-          <div className="border rounded-md h-[60vh] overflow-auto bg-white">
-            {previewItem?.payload?.html ? (
-              <div
-                className="p-4 prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: previewItem.payload.html }}
-              />
-            ) : (
-              <div className="p-4 text-sm text-muted-foreground">No HTML available.</div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPreviewItem(null)}>
-              Close
-            </Button>
-            {previewItem?.payload?.ics && <Button onClick={() => downloadIcs(previewItem!)}>Download ICS</Button>}
+          <DialogFooter className="flex justify-between">
+            <div>
+              {draft?.id && (
+                <Button variant="destructive" onClick={deleteEvent}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={upsertEvent}>{draft?.id ? "Update" : "Create"}</Button>
+              <Button onClick={sendInvites} disabled={!draft?.id} variant="secondary">
+                Trigger Invites
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   )
 }
+
+export { CalendarBoard }

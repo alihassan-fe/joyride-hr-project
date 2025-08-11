@@ -24,7 +24,7 @@ export function CandidateDrawer({
 }: Props) {
   const [notes, setNotes] = React.useState("")
   const [saving, setSaving] = React.useState(false)
-
+  console.log("candia", candidate)
   React.useEffect(() => {
     setNotes(candidate?.notes || "")
   }, [candidate])
@@ -99,7 +99,7 @@ export function CandidateDrawer({
             <div className="space-y-2">
               <div className="text-sm text-neutral-500">Strengths</div>
               <ul className="flex flex-wrap gap-2">
-                {(candidate.strengths || []).map((s, i) => (
+                {(candidate?.strengths || []).map((s, i) => (
                   <li key={i} className="text-sm">{s}</li>
                 ))}
               </ul>
@@ -108,7 +108,7 @@ export function CandidateDrawer({
             <div className="space-y-2">
               <div className="text-sm text-neutral-500">Weaknesses</div>
               <ul className="list-disc pl-5 space-y-1">
-                {(candidate.weaknesses || []).map((w, i) => (
+                {(candidate?.weaknesses || []).map((w, i) => (
                   <li key={i} className="text-sm">{w}</li>
                 ))}
               </ul>
@@ -141,8 +141,8 @@ export function CandidateDrawer({
                 {recommendationOrder.map((rec) => (
                   <Button
                     key={rec}
-                    variant={rec === "Remove" ? "destructive" : "secondary"}
-                    className={cn(rec !== "Remove" ? "bg-neutral-100 text-neutral-900 hover:bg-neutral-200" : "")}
+                    variant={rec === candidate.recommendation ? "destructive" : "secondary"}
+                    className={"bg-neutral-100 text-neutral-900 hover:bg-neutral-200"}
                     onClick={() => updateRecommendation(rec)}
                     disabled={saving}
                   >

@@ -14,28 +14,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { ExternalLink, RefreshCw, FileText, Info, ArrowRight } from "lucide-react"
+import { Candidate } from "@/lib/types"
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false })
 
-type WebhookCandidate = {
-  id: number
-  name: string
-  email: string
-  phone: string
-  cvLink?: string
-  dispatch?: number
-  operationsManager?: number
-  strengths?: string[]
-  weaknesses?: string[]
-  notes?: string
-  recommendation?: string // 'Remove' | 'Consider' | undefined
-}
-
-// Change this URL to your actual n8n public webhook
-const WEBHOOK_URL = `${process.env.NEXT_PUBLIC_WEBHOOK_DOMAIN}/webhook/candidates`
-
 export default function DashboardPage() {
-  const [data, setData] = useState<WebhookCandidate[]>([])
+  const [data, setData] = useState<Candidate[]>([])
   console.log("data", data);
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>("")
@@ -44,19 +28,11 @@ export default function DashboardPage() {
   const [dialogItems, setDialogItems] = useState<string[]>([])
 
   async function fetchData() {
-    setLoading(true)
-    setError("")
-    try {
-      const res = await fetch(WEBHOOK_URL, { cache: "no-store" })
-      if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`)
-      const json = (await res.json()) as WebhookCandidate[] | { data: WebhookCandidate[] }
-      const arr = Array.isArray(json) ? json : (json as any).data
-      console.log("arr", arr)
-      if (!Array.isArray(arr)) throw new Error("Unexpected response shape")
-      setData(arr.length > 0 ? arr : [])
-    } catch (e: any) {
-      setError(e.message || "Failed to fetch candidates")
-      setData([])
+  try {
+      setLoading(true)
+      const res = await fetch("/api/candidates")
+      const data = await res.json()
+      setData(data?.data ?? [])
     } finally {
       setLoading(false)
     }
@@ -76,7 +52,7 @@ export default function DashboardPage() {
   const lineChartOption = useMemo(() => {
     const names = data.map((c) => c.name)
     const dispatchScores = data.map((c) => Number(c.dispatch ?? 0))
-    const opsScores = data.map((c) => Number(c.operationsManager ?? 0))
+    const opsScores = data.map((c) => Number(c.operations_manager ?? 0))
     return {
       tooltip: { trigger: "axis" },
       legend: { data: ["Dispatch", "Ops Manager"] },
@@ -120,7 +96,7 @@ export default function DashboardPage() {
           : "0",
       avgOpsManager:
         candidates.length > 0
-          ? (candidates.reduce((sum, c) => sum + (c.operationsManager || 0), 0) / candidates.length).toFixed(1)
+          ? (candidates.reduce((sum, c) => sum + (c.operations_manager || 0), 0) / candidates.length).toFixed(1)
           : "0",
     }
   }, [data])
@@ -130,14 +106,14 @@ const groupedBarData = useMemo(() => {
   return [...data]
     .sort(
       (a, b) =>
-        (Number(b.dispatch ?? 0) + Number(b.operationsManager ?? 0)) -
-        (Number(a.dispatch ?? 0) + Number(a.operationsManager ?? 0))
+        (Number(b.dispatch ?? 0) + Number(b.operations_manager ?? 0)) -
+        (Number(a.dispatch ?? 0) + Number(a.operations_manager ?? 0))
     )
     .slice(0, 5) // top 5 results
     .map((c) => ({
       name: c.name,
       dispatch: Number(c.dispatch ?? 0),
-      ops: Number(c.operationsManager ?? 0),
+      ops: Number(c.operations_manager ?? 0),
     }));
 }, [data]);
 
@@ -422,15 +398,15 @@ const groupedBarData = useMemo(() => {
                           {typeof c.dispatch === "number" ? c.dispatch : "-"}
                         </TableCell>
                         <TableCell className="min-w-[100px] whitespace-nowrap">
-                          {typeof c.operationsManager === "number" ? c.operationsManager : "-"}
+                          {typeof c.operations_manager === "number" ? c.operations_manager : "-"}
                         </TableCell>
                                                 <TableCell className="min-w-[120px] whitespace-nowrap">
-                          <RecommendationBadge value={c.recommendation} />
+                          <RecommendationBadge value={c.recommendation || ""} />
                         </TableCell>
                         <TableCell className="min-w-[80px] whitespace-nowrap">
-                          {c.cvLink ? (
+                          {c.cv_link ? (
                             <a
-                              href={c.cvLink}
+                              href={c.cv_link}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center text-sm text-neutral-700 hover:underline"

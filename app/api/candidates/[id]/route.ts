@@ -39,10 +39,10 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
   try {
     const sql = getSql()
-    const candidateId = Number.parseInt(params.id, 10)
+    const candidateId = Number.parseInt(context.params.id, 10)
     if (Number.isNaN(candidateId)) {
       return NextResponse.json({ error: "Invalid candidate id" }, { status: 400 })
     }

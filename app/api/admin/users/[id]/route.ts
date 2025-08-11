@@ -8,7 +8,7 @@ function isAdmin(session: any) {
   return session?.user && (session.user as any)?.role === "Admin"
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, context: { params: { id: string } }) {
   const session = await auth()
   if (!isAdmin(session)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
@@ -41,7 +41,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
           WHEN ${password} IS NULL OR ${password} = '' THEN password_hash
           ELSE crypt(${password}, gen_salt('bf'))
         END
-      WHERE id = ${params.id}::uuid
+      WHERE id = ${context.params.id}::uuid
       RETURNING id::text, email, name, role, created_at
     `
     if (rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 })
@@ -51,14 +51,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: { id: string } }) {
   const session = await auth()
   if (!isAdmin(session)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
   try {
     const rows = await sql<{ id: string }[]>`
-      DELETE FROM users WHERE id = ${params.id}::uuid RETURNING id::text
+      DELETE FROM users WHERE id = ${context.params.id}::uuid RETURNING id::text
     `
     if (rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 })
     return NextResponse.json({ ok: true })

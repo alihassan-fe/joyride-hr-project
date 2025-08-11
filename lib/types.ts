@@ -5,9 +5,9 @@ id: number
   name: string
   email: string
   phone: string
-  cvLink?: string
+  cv_link?: string
   dispatch?: number
-  operationsManager?: number
+  operations_manager?: number
   strengths?: string[]
   weaknesses?: string[]
   notes?: string

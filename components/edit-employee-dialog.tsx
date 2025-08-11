@@ -31,13 +31,14 @@ type Props = {
   employee: EmployeeRow
   onUpdated?: () => void
   trigger?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 const ROLES = ["Employee", "Manager", "Admin", "Viewer"] as const
 
-export default function EditEmployeeDialog({ employee, onUpdated, trigger }: Props) {
+export default function EditEmployeeDialog({ employee, onUpdated, trigger, open, onOpenChange }: Props) {
   const { toast } = useToast()
-  const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [name, setName] = useState(employee.name)
@@ -66,7 +67,7 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger }: Pro
         throw new Error(j?.error || "Failed to update employee")
       }
       toast({ title: "Employee updated", description: `${name} saved successfully.` })
-      setOpen(false)
+      onOpenChange?.(false)
       onUpdated?.()
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Update failed." })
@@ -76,7 +77,7 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger }: Pro
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm">
@@ -122,7 +123,7 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger }: Pro
             <Input id="emp_pto" type="number" value={pto} onChange={(e) => setPto(e.target.value)} />
           </div>
           <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange?.(false)} disabled={saving}>
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>
