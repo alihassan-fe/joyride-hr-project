@@ -298,6 +298,15 @@ export default function CalendarBoard() {
       return
     }
 
+    if (!Number.isInteger(draft.id) || draft.id <= 0) {
+      toast({
+        title: "Error",
+        description: "Invalid event ID. Please save the event first.",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!webhookUrl.trim()) {
       toast({
         title: "Error",
