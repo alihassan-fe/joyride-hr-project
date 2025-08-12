@@ -5,16 +5,17 @@ import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import NewEmployeeDialog from "@/components/new-employee-dialog"
 import EditEmployeeDialog, { type EmployeeRow } from "@/components/edit-employee-dialog"
 import { useToast } from "@/hooks/use-toast"
-import { Trash2, Pencil } from "lucide-react"
+import { Trash2, Pencil, User, StickyNote, Eye } from "lucide-react"
+import Link from "next/link"
 
-type Employee = EmployeeRow
-
-type Broadcast = { id: number; title: string; message: string; created_at: string }
+type Employee = EmployeeRow & {
+  document_count?: number
+  notes_count?: number
+}
 
 export default function EmployeesPage() {
   const { toast } = useToast()
@@ -23,9 +24,6 @@ export default function EmployeesPage() {
 
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
-  const [title, setTitle] = useState("")
-  const [message, setMessage] = useState("")
-  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([])
   const [editing, setEditing] = useState<Employee | null>(null)
   const [deleting, setDeleting] = useState<Employee | null>(null)
 
@@ -34,22 +32,41 @@ export default function EmployeesPage() {
       setLoading(true)
       const res = await fetch("/api/employees")
       const data = await res.json()
-      setEmployees(data?.data ?? [])
+
+      const employeesWithCounts = await Promise.all(
+        (data?.data ?? []).map(async (employee: Employee) => {
+          try {
+            // Fetch document count
+            const docRes = await fetch(`/api/employees/${employee.id}/documents`)
+            const docData = docRes.ok ? await docRes.json() : { documents: [] }
+
+            // Fetch notes count
+            const notesRes = await fetch(`/api/employees/${employee.id}/notes`)
+            const notesData = notesRes.ok ? await notesRes.json() : { notes: [] }
+
+            return {
+              ...employee,
+              document_count: docData.documents?.length || 0,
+              notes_count: notesData.notes?.length || 0,
+            }
+          } catch (error) {
+            return {
+              ...employee,
+              document_count: 0,
+              notes_count: 0,
+            }
+          }
+        }),
+      )
+
+      setEmployees(employeesWithCounts)
     } finally {
       setLoading(false)
     }
   }
-  const fetchBroadcasts = async () => {
-    // legacy; safe no-op if route removed
-    try {
-      const res = await fetch("/api/broadcasts")
-      if (res.ok) setBroadcasts(await res.json())
-    } catch {}
-  }
 
   useEffect(() => {
     fetchEmployees()
-    fetchBroadcasts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -69,13 +86,32 @@ export default function EmployeesPage() {
     }
   }
 
+  const getDocumentStatus = (count: number) => {
+    const total = 7 // Total document types required
+    if (count === 0) return <Badge variant="destructive">No Documents</Badge>
+    if (count < total)
+      return (
+        <Badge variant="secondary">
+          {count}/{total} Documents
+        </Badge>
+      )
+    return (
+      <Badge variant="default">
+        Complete ({count}/{total})
+      </Badge>
+    )
+  }
+
   return (
     <div className="grid gap-6">
       <Card className="shadow-xl rounded-2xl">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Employee Directory</CardTitle>
-            <p className="text-sm text-muted-foreground">{"Manage your team"}</p>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Employee Directory
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Manage your team and their documents</p>
           </div>
           {isAdmin && <NewEmployeeDialog onCreated={fetchEmployees} />}
         </CardHeader>
@@ -84,27 +120,44 @@ export default function EmployeesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Employee</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Start</TableHead>
+                  <TableHead>Start Date</TableHead>
+                  <TableHead>Documents</TableHead>
+                  <TableHead>Notes</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {employees.map((e) => (
                   <TableRow key={e.id}>
-                    <TableCell className="whitespace-nowrap">{e.name}</TableCell>
-                    <TableCell className="whitespace-nowrap">{e.email}</TableCell>
-                    <TableCell className="whitespace-nowrap">{e.role}</TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{e.name}</p>
+                        <p className="text-sm text-muted-foreground">{e.email}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{e.role}</Badge>
+                    </TableCell>
                     <TableCell className="whitespace-nowrap">
                       {e.start_date ? new Date(e.start_date).toLocaleDateString() : "-"}
                     </TableCell>
+                    <TableCell>{getDocumentStatus(e.document_count || 0)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <StickyNote className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{e.notes_count || 0}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => (window.location.href = "/calendar")}>
-                          View Schedule
-                        </Button>
+                        <Link href={`/employees/${e.id}`}>
+                          <Button variant="outline" size="sm">
+                            <Eye className="mr-1 h-4 w-4" />
+                            Profile
+                          </Button>
+                        </Link>
                         {isAdmin && (
                           <>
                             <Button variant="outline" size="sm" onClick={() => setEditing(e)}>
@@ -123,7 +176,7 @@ export default function EmployeesPage() {
                 ))}
                 {employees.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
                       {loading ? "Loading..." : "No employees found"}
                     </TableCell>
                   </TableRow>
@@ -133,48 +186,6 @@ export default function EmployeesPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Optional legacy broadcasts UI left intact; can be removed later */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-xl rounded-2xl">
-          <CardHeader>
-            <CardTitle>Send Broadcast</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            <div className="space-y-2">
-              <Label>Title</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Company Update" />
-            </div>
-            <div className="space-y-2">
-              <Label>Message</Label>
-              <Input
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Message to all employees"
-              />
-            </div>
-            <div>
-              <Button onClick={() => toast({ title: "Broadcast disabled in this build" })}>Send</Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-xl rounded-2xl">
-          <CardHeader>
-            <CardTitle>Recent Broadcasts</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {broadcasts.length === 0 && <div className="text-sm text-muted-foreground">No broadcasts yet.</div>}
-            {broadcasts.map((b) => (
-              <div key={b.id} className="border rounded-md p-3">
-                <div className="text-sm font-medium">{b.title}</div>
-                <div className="text-sm text-muted-foreground">{b.message}</div>
-                <div className="text-xs text-muted-foreground mt-1">{new Date(b.created_at).toLocaleString()}</div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Edit employee dialog */}
       {editing && (

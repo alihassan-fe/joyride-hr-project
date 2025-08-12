@@ -7,13 +7,14 @@ export default withAuth(
     const token = req.nextauth.token
 
     // Protect all dashboard routes
-    if (pathname.startsWith("/dashboard") || 
-        pathname.startsWith("/applicants") || 
-        pathname.startsWith("/employees") || 
-        pathname.startsWith("/calendar") || 
-        pathname.startsWith("/broadcasts") || 
-        pathname.startsWith("/admin")) {
-      
+    if (
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/applicants") ||
+      pathname.startsWith("/employees") ||
+      pathname.startsWith("/calendar") ||
+      pathname.startsWith("/broadcasts") ||
+      pathname.startsWith("/admin")
+    ) {
       // If no token (not authenticated), redirect to login
       if (!token) {
         const url = new URL("/login", req.url)
@@ -37,11 +38,9 @@ export default withAuth(
     callbacks: {
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl
-        
+
         // Allow access to auth pages and home page
-        if (pathname.startsWith("/login") || 
-            pathname.startsWith("/api/auth") || 
-            pathname === "/") {
+        if (pathname.startsWith("/login") || pathname.startsWith("/api/auth") || pathname === "/") {
           return true
         }
 
@@ -49,7 +48,7 @@ export default withAuth(
         return !!token
       },
     },
-  }
+  },
 )
 
 export const config = {
