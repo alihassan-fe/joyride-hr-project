@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth-next"
-import { neon } from "@neondatabase/serverless"
+import { sql } from "@/lib/sql"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CreateUserForm } from "@/components/create-user-form"
 import AdminUsersTable, { type UserRow } from "@/components/admin-users-table"
 
 async function loadUsers(): Promise<UserRow[]> {
-  const sql = neon(process.env.DATABASE_URL as string)
   const rows = await sql<
     UserRow[]
   >`select id::text, email, name, role, created_at from users order by created_at desc nulls last limit 200`

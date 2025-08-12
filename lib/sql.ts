@@ -32,3 +32,5 @@ export function getSql() {
   }
   return _sql
 }
+
+export const sql = getSql()
