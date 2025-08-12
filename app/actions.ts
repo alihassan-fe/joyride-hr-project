@@ -1,9 +1,8 @@
 // app/actions.ts
-"use server";
-import { neon } from "@neondatabase/serverless";
+"use server"
+import { sql } from "@/lib/db"
 
 export async function getData() {
-    const sql = neon(process.env.DATABASE_URL);
-    const data = await sql`...`;
-    return data;
+  const data = await sql`SELECT * FROM your_table`
+  return data
 }
