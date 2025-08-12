@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, User, Mail, Calendar, Clock, MapPin, Phone } from "lucide-react"
+import { ArrowLeft, User, Mail, Calendar, Clock } from "lucide-react"
 import Link from "next/link"
 import { DocumentUpload } from "@/components/document-upload"
 import { EmployeeNotes } from "@/components/employee-notes"
@@ -15,9 +15,6 @@ interface Employee {
   role: string
   start_date: string
   pto_balance: number
-  location?: string
-  phone?: string
-  department?: string
 }
 
 interface Document {
@@ -40,7 +37,7 @@ interface Note {
 async function getEmployee(id: string): Promise<Employee | null> {
   try {
     const result = await sql`
-      SELECT id, name, email, role, start_date, pto_balance, location, phone, department
+      SELECT id, name, email, role, start_date, pto_balance
       FROM employees 
       WHERE id = ${id}
     `
@@ -147,15 +144,6 @@ export default async function EmployeeProfilePage({ params }: { params: { id: st
                   <p className="text-sm text-muted-foreground">{employee.email}</p>
                 </div>
               </div>
-              {employee.phone && (
-                <div className="flex items-center gap-3">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Phone</p>
-                    <p className="text-sm text-muted-foreground">{employee.phone}</p>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="space-y-4">
@@ -166,15 +154,6 @@ export default async function EmployeeProfilePage({ params }: { params: { id: st
                   <Badge variant="secondary">{employee.role}</Badge>
                 </div>
               </div>
-              {employee.department && (
-                <div className="flex items-center gap-3">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Department</p>
-                    <p className="text-sm text-muted-foreground">{employee.department}</p>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="space-y-4">
