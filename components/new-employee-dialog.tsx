@@ -35,6 +35,9 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
   const [role, setRole] = useState<(typeof ROLE_OPTIONS)[number]>("Employee")
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().slice(0, 10))
   const [pto, setPto] = useState<number>(0)
+  const [location, setLocation] = useState("")
+  const [emergencyContact, setEmergencyContact] = useState("")
+  const [emergencyPhone, setEmergencyPhone] = useState("")
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -52,6 +55,10 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
           email: email.trim().toLowerCase(),
           role,
           start_date: new Date(startDate).toISOString(),
+          pto_balance: pto,
+          location: location.trim() || null,
+          emergency_contact: emergencyContact.trim() || null,
+          emergency_phone: emergencyPhone.trim() || null,
         }),
       })
       if (!res.ok) {
@@ -70,6 +77,9 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
       setRole("Employee")
       setStartDate(new Date().toISOString().slice(0, 10))
       setPto(0)
+      setLocation("")
+      setEmergencyContact("")
+      setEmergencyPhone("")
       onCreated?.()
     } finally {
       setSubmitting(false)
@@ -81,12 +91,10 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
       <DialogTrigger asChild>
         <Button className={triggerClassName}>New Employee</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Employee</DialogTitle>
-          <DialogDescription>
-            {"Create a new employee record with role, start date, and PTO balance."}
-          </DialogDescription>
+          <DialogDescription>{"Create a new employee record with complete profile information."}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid gap-2">
@@ -122,6 +130,44 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
           <div className="grid gap-2">
             <Label htmlFor="start">Start Date</Label>
             <Input id="start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="pto_balance">PTO Balance</Label>
+            <Input
+              id="pto_balance"
+              type="number"
+              value={pto}
+              onChange={(e) => setPto(Number(e.target.value))}
+              placeholder="0"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="location">Location</Label>
+            <Input
+              id="location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="City, Country"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="emergency_contact">Emergency Contact</Label>
+            <Input
+              id="emergency_contact"
+              value={emergencyContact}
+              onChange={(e) => setEmergencyContact(e.target.value)}
+              placeholder="Contact person name"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="emergency_phone">Emergency Phone</Label>
+            <Input
+              id="emergency_phone"
+              type="tel"
+              value={emergencyPhone}
+              onChange={(e) => setEmergencyPhone(e.target.value)}
+              placeholder="+1 (555) 123-4567"
+            />
           </div>
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={submitting}>

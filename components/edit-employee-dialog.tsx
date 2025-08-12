@@ -25,6 +25,9 @@ export type EmployeeRow = {
   role: string
   start_date: string
   pto_balance?: number
+  location?: string
+  emergency_contact?: string
+  emergency_phone?: string
 }
 
 type Props = {
@@ -45,6 +48,9 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger }: Pro
   const [role, setRole] = useState<string>(employee.role || "Employee")
   const [startDate, setStartDate] = useState<string>(employee.start_date?.slice(0, 10) || "")
   const [pto, setPto] = useState<string>(String(employee.pto_balance ?? 0))
+  const [location, setLocation] = useState(employee.location || "")
+  const [emergencyContact, setEmergencyContact] = useState(employee.emergency_contact || "")
+  const [emergencyPhone, setEmergencyPhone] = useState(employee.emergency_phone || "")
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -59,6 +65,9 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger }: Pro
           role,
           start_date: startDate ? new Date(startDate).toISOString() : null,
           pto_balance: Number.isFinite(Number(pto)) ? Number(pto) : 0,
+          location: location.trim() || null,
+          emergency_contact: emergencyContact.trim() || null,
+          emergency_phone: emergencyPhone.trim() || null,
         }),
       })
       if (!res.ok) {
@@ -84,7 +93,7 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger }: Pro
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit employee</DialogTitle>
           <DialogDescription>Update profile details and role.</DialogDescription>
@@ -120,6 +129,34 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger }: Pro
           <div className="grid gap-2">
             <Label htmlFor="emp_pto">PTO balance</Label>
             <Input id="emp_pto" type="number" value={pto} onChange={(e) => setPto(e.target.value)} />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="emp_location">Location</Label>
+            <Input
+              id="emp_location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="City, Country"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="emp_emergency_contact">Emergency Contact</Label>
+            <Input
+              id="emp_emergency_contact"
+              value={emergencyContact}
+              onChange={(e) => setEmergencyContact(e.target.value)}
+              placeholder="Contact person name"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="emp_emergency_phone">Emergency Phone</Label>
+            <Input
+              id="emp_emergency_phone"
+              type="tel"
+              value={emergencyPhone}
+              onChange={(e) => setEmergencyPhone(e.target.value)}
+              placeholder="+1 (555) 123-4567"
+            />
           </div>
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
