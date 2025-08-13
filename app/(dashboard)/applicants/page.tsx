@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
-import { ExternalLink, RefreshCw, FileText, Info, Upload } from "lucide-react"
+import { ExternalLink, RefreshCw, FileText, Info } from "lucide-react"
 import { ManualUpload } from "@/components/manual-upload"
-import { Input } from "@/components/ui/input" 
-import {CandidateDrawer} from "@/components/candidate-drawer"
+import { Input } from "@/components/ui/input"
+import { CandidateDrawer } from "@/components/candidate-drawer"
 import {
   Select,
   SelectContent,
@@ -20,8 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Candidate } from "@/lib/types"
-
+import type { Candidate } from "@/lib/types"
 
 // Use the same webhook as the Dashboard
 const WEBHOOK_URL = `${process.env.NEXT_PUBLIC_WEBHOOK_DOMAIN}/webhook/candidates`
@@ -31,6 +30,7 @@ export default function ApplicantsPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>("")
   const [recommendationFilter, setRecommendationFilter] = useState<string>("all")
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all")
   const [selected, setSelected] = useState<Candidate | null>(null)
 
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -75,19 +75,23 @@ export default function ApplicantsPage() {
       if ((c.recommendation || "").toLowerCase() !== recommendationFilter) return false
     }
 
+    if (departmentFilter !== "all") {
+      if ((c.department || "").toLowerCase() !== departmentFilter.toLowerCase()) return false
+    }
+
     return true
   })
 
   const totalPages = Math.ceil(filteredData.length / PAGE_SIZE)
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
+  const departments = Array.from(new Set(data.map((c) => c.department).filter(Boolean)))
 
   function openListDialog(title: string, items: string[] = []) {
     setDialogTitle(title)
     setDialogItems(items)
     setDialogOpen(true)
   }
-  
 
   return (
     <div className="space-y-6">
@@ -118,39 +122,61 @@ export default function ApplicantsPage() {
         </Card>
       )}
 
-      {/* Search input */}
-      <div className="w-full grid grid-cols-3 gap-5">
+      {/* Search and filters */}
+      <div className="w-full grid grid-cols-4 gap-5">
         <Input
           placeholder="Search by name, email, or phone..."
           value={search}
           onChange={(e) => {
             setSearch(e.target.value)
-            setPage(1) // Reset to first page on search
+            setPage(1)
           }}
         />
-     <Select
-      value={recommendationFilter}
-      onValueChange={(value) => {
-        setRecommendationFilter(value)
-        setPage(1)
-      }}
-    >
-      <SelectTrigger className="w-full text-sm">
-        <SelectValue placeholder="All Recommendations" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          <SelectLabel>Recommendation</SelectLabel>
-          <SelectItem value="all">All Recommendations</SelectItem>
-          <SelectItem value="remove">Remove</SelectItem>
-          <SelectItem value="call immediately">Consider</SelectItem>
-          <SelectItem value="shortlist">Shortlist</SelectItem>
-        </SelectGroup>
-      </SelectContent>
-    </Select>
+        <Select
+          value={recommendationFilter}
+          onValueChange={(value) => {
+            setRecommendationFilter(value)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="w-full text-sm">
+            <SelectValue placeholder="All Recommendations" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel>Recommendation</SelectLabel>
+              <SelectItem value="all">All Recommendations</SelectItem>
+              <SelectItem value="remove">Remove</SelectItem>
+              <SelectItem value="call immediately">Consider</SelectItem>
+              <SelectItem value="shortlist">Shortlist</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <Select
+          value={departmentFilter}
+          onValueChange={(value) => {
+            setDepartmentFilter(value)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="w-full text-sm">
+            <SelectValue placeholder="All Departments" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel>Department</SelectLabel>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map((dept) => (
+                <SelectItem key={dept} value={dept!}>
+                  {dept}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Applicants Table (mirrors Dashboard table) */}
+      {/* Applicants Table */}
       <Card className="rounded-2xl shadow-md">
         <CardHeader>
           <CardTitle className="text-base">Applicants</CardTitle>
@@ -163,15 +189,14 @@ export default function ApplicantsPage() {
                   <TableHead className="min-w-[150px] whitespace-nowrap">Name</TableHead>
                   <TableHead className="min-w-[200px] whitespace-nowrap">Email</TableHead>
                   <TableHead className="min-w-[120px] whitespace-nowrap">Phone</TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">Department</TableHead>
                   <TableHead className="min-w-[80px] whitespace-nowrap">Dispatch</TableHead>
                   <TableHead className="min-w-[100px] whitespace-nowrap">Ops Manager</TableHead>
-                  <TableHead className="min-w-[120px] whitespace-nowrap">Recommendation
-                  </TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">Recommendation</TableHead>
                   <TableHead className="min-w-[80px] whitespace-nowrap">CV</TableHead>
                   <TableHead className="min-w-[100px] whitespace-nowrap">Strengths</TableHead>
                   <TableHead className="min-w-[100px] whitespace-nowrap">Weaknesses</TableHead>
-                  <TableHead className="min-w-[200px]">Notes
-                  </TableHead>
+                  <TableHead className="min-w-[200px]">Notes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -187,14 +212,20 @@ export default function ApplicantsPage() {
                       <TableCell className="min-w-[120px] whitespace-nowrap">
                         <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
                       </TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
                       <TableCell className="min-w-[80px] whitespace-nowrap">
                         <div className="h-4 w-full max-w-[60px] rounded bg-neutral-100 animate-pulse" />
                       </TableCell>
                       <TableCell className="min-w-[100px] whitespace-nowrap">
                         <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
                       </TableCell>
-                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
                         <div className="h-4 w-full max-w-[60px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
                       </TableCell>
                       <TableCell className="min-w-[100px] whitespace-nowrap">
                         <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
@@ -205,24 +236,32 @@ export default function ApplicantsPage() {
                       <TableCell className="min-w-[200px]">
                         <div className="h-4 w-full max-w-[180px] rounded bg-neutral-100 animate-pulse" />
                       </TableCell>
-                      <TableCell className="min-w-[120px] whitespace-nowrap">
-                        <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
-                      </TableCell>
                     </TableRow>
                   ))}
                 {!loading &&
                   paginatedData.map((c) => (
-                    <TableRow key={c.id} className="hover:bg-neutral-50" >
-                      <TableCell className="font-medium min-w-[150px] whitespace-nowrap"  onClick={() => setSelected(c)}>{c.name}</TableCell>
+                    <TableRow key={c.id} className="hover:bg-neutral-50">
+                      <TableCell className="font-medium min-w-[150px] whitespace-nowrap" onClick={() => setSelected(c)}>
+                        {c.name}
+                      </TableCell>
                       <TableCell className="text-neutral-600 min-w-[200px] whitespace-nowrap">{c.email}</TableCell>
                       <TableCell className="text-neutral-600 min-w-[120px] whitespace-nowrap">{c.phone}</TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
+                        {c.department ? (
+                          <Badge variant="outline" className="text-xs">
+                            {c.department}
+                          </Badge>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="min-w-[80px] whitespace-nowrap">
                         {typeof c.dispatch === "number" ? c.dispatch : "-"}
                       </TableCell>
                       <TableCell className="min-w-[100px] whitespace-nowrap">
                         {typeof c.operationsManager === "number" ? c.operationsManager : "-"}
                       </TableCell>
-                                            <TableCell className="min-w-[120px] whitespace-nowrap">
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
                         <RecommendationBadge value={c.recommendation} />
                       </TableCell>
                       <TableCell className="min-w-[80px] whitespace-nowrap">
@@ -284,7 +323,7 @@ export default function ApplicantsPage() {
                   ))}
                 {!loading && data.length === 0 && !error && (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-sm text-neutral-500">
+                    <TableCell colSpan={11} className="text-sm text-neutral-500">
                       No applicants found from the webhook.
                     </TableCell>
                   </TableRow>
@@ -292,14 +331,9 @@ export default function ApplicantsPage() {
               </TableBody>
             </Table>
           </div>
-           {/* Pagination controls */}
+          {/* Pagination controls */}
           <div className="flex justify-center items-center gap-2 mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page === 1}
-              onClick={() => setPage(page - 1)}
-            >
+            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
               Prev
             </Button>
             <span className="text-sm">
@@ -342,7 +376,9 @@ export default function ApplicantsPage() {
       <CandidateDrawer
         candidate={selected}
         onClose={() => setSelected(null)}
-        onUpdated={async () => { await fetchData(); }}
+        onUpdated={async () => {
+          await fetchData()
+        }}
       />
     </div>
   )

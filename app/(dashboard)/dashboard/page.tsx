@@ -29,6 +29,7 @@ type WebhookCandidate = {
   weaknesses?: string[]
   notes?: string
   recommendation?: string // 'Remove' | 'Consider' | undefined
+  department?: string
 }
 
 type Broadcast = {
@@ -538,6 +539,7 @@ export default function DashboardPage() {
                   <TableHead className="min-w-[150px] whitespace-nowrap">Name</TableHead>
                   <TableHead className="min-w-[200px] whitespace-nowrap">Email</TableHead>
                   <TableHead className="min-w-[120px] whitespace-nowrap">Phone</TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">Department</TableHead>
                   <TableHead className="min-w-[80px] whitespace-nowrap">Dispatch</TableHead>
                   <TableHead className="min-w-[100px] whitespace-nowrap">Ops Manager</TableHead>
                   <TableHead className="min-w-[120px] whitespace-nowrap">Recommendation</TableHead>
@@ -556,6 +558,9 @@ export default function DashboardPage() {
                       </TableCell>
                       <TableCell className="min-w-[200px] whitespace-nowrap">
                         <div className="h-4 w-full max-w-[180px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
                       </TableCell>
                       <TableCell className="min-w-[120px] whitespace-nowrap">
                         <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
@@ -589,6 +594,15 @@ export default function DashboardPage() {
                       <TableCell className="font-medium min-w-[150px] whitespace-nowrap">{c.name}</TableCell>
                       <TableCell className="text-neutral-600 min-w-[200px] whitespace-nowrap">{c.email}</TableCell>
                       <TableCell className="text-neutral-600 min-w-[120px] whitespace-nowrap">{c.phone}</TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
+                        {c.department ? (
+                          <Badge variant="outline" className="text-xs">
+                            {c.department}
+                          </Badge>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="min-w-[80px] whitespace-nowrap">
                         {typeof c.dispatch === "number" ? c.dispatch : "-"}
                       </TableCell>
@@ -657,7 +671,7 @@ export default function DashboardPage() {
                   ))}
                 {!loading && data.length === 0 && !error && (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-sm text-neutral-500">
+                    <TableCell colSpan={11} className="text-sm text-neutral-500">
                       No candidates found from the webhook.
                     </TableCell>
                   </TableRow>
