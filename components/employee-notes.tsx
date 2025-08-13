@@ -46,7 +46,7 @@ export function EmployeeNotes({ employeeId, notes, onNotesChange }: EmployeeNote
         },
         body: JSON.stringify({
           note: newNote.trim(),
-          createdBy: "Admin", // TODO: Get from session
+          createdBy: null, // TODO: Get actual user ID from session
         }),
       })
 
