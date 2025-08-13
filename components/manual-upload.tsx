@@ -26,6 +26,8 @@ export function ManualUpload({ onAdded = () => {} }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const WEBHOOK_URL = `${process.env.NEXT_PUBLIC_WEBHOOK_DOMAIN}/webhook/manual-cv-upload`
 
+  const departmentOptions = ["Operations", "Maintenance", "Safety", "Billing Payroll"]
+
   async function handleUpload() {
     if (!file) return
     setUploading(true)
@@ -90,12 +92,19 @@ export function ManualUpload({ onAdded = () => {} }: Props) {
             />
           </div>
           <div className="space-y-1">
-            <Label>Department (Optional)</Label>
-            <Input
-              placeholder="e.g., Engineering, Marketing, Operations"
+            <Label>Department</Label>
+            <select
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
-            />
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select Department</option>
+              {departmentOptions.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <Button onClick={handleUpload} disabled={!file || uploading}>

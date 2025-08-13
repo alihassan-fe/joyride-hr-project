@@ -30,6 +30,10 @@ type WebhookCandidate = {
   notes?: string
   recommendation?: string // 'Remove' | 'Consider' | undefined
   department?: string
+  department_specific_data?: {
+    dispatch?: number
+    operations_manager?: number
+  }
 }
 
 type Broadcast = {
@@ -56,7 +60,7 @@ type OutboxItem = {
 }
 
 // Change this URL to your actual n8n public webhook
-const WEBHOOK_URL = `${process.env.NEXT_PUBLIC_WEBHOOK_DOMAIN}/webhook/candidates`
+// const WEBHOOK_URL = `${process.env.NEXT_PUBLIC_WEBHOOK_DOMAIN}/webhook/candidates`
 
 export default function DashboardPage() {
   const [data, setData] = useState<WebhookCandidate[]>([])
@@ -77,13 +81,11 @@ export default function DashboardPage() {
     setLoading(true)
     setError("")
     try {
-      const res = await fetch(WEBHOOK_URL, { cache: "no-store" })
+      const res = await fetch("/api/candidates", { cache: "no-store" })
       if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`)
-      const json = (await res.json()) as WebhookCandidate[] | { data: WebhookCandidate[] }
-      const arr = Array.isArray(json) ? json : (json as any).data
-      console.log("arr", arr)
-      if (!Array.isArray(arr)) throw new Error("Unexpected response shape")
-      setData(arr.length > 0 ? arr : [])
+      const json = await res.json()
+      const arr = Array.isArray(json) ? json : json.data || []
+      setData(arr)
     } catch (e: any) {
       setError(e.message || "Failed to fetch candidates")
       setData([])
@@ -141,8 +143,10 @@ export default function DashboardPage() {
   // Score comparison for existing ECharts line
   const lineChartOption = useMemo(() => {
     const names = data.map((c) => c.name)
-    const dispatchScores = data.map((c) => Number(c.dispatch ?? 0))
-    const opsScores = data.map((c) => Number(c.operationsManager ?? 0))
+    const dispatchScores = data.map((c) => Number(c.department_specific_data?.dispatch || c.dispatch || 0))
+    const opsScores = data.map((c) =>
+      Number(c.department_specific_data?.operations_manager || c.operationsManager || 0),
+    )
     return {
       tooltip: { trigger: "axis" },
       legend: { data: ["Dispatch", "Ops Manager"] },
@@ -182,11 +186,19 @@ export default function DashboardPage() {
       shortlist: candidates.filter((c) => c.recommendation?.toLowerCase() === "shortlist").length,
       avgDispatch:
         candidates.length > 0
-          ? (candidates.reduce((sum, c) => sum + (c.dispatch || 0), 0) / candidates.length).toFixed(1)
+          ? (
+              candidates.reduce((sum, c) => sum + (c.department_specific_data?.dispatch || c.dispatch || 0), 0) /
+              candidates.length
+            ).toFixed(1)
           : "0",
       avgOpsManager:
         candidates.length > 0
-          ? (candidates.reduce((sum, c) => sum + (c.operationsManager || 0), 0) / candidates.length).toFixed(1)
+          ? (
+              candidates.reduce(
+                (sum, c) => sum + (c.department_specific_data?.operations_manager || c.operationsManager || 0),
+                0,
+              ) / candidates.length
+            ).toFixed(1)
           : "0",
     }
   }, [data])
@@ -196,15 +208,16 @@ export default function DashboardPage() {
     return [...data]
       .sort(
         (a, b) =>
-          Number(b.dispatch ?? 0) +
-          Number(b.operationsManager ?? 0) -
-          (Number(a.dispatch ?? 0) + Number(a.operationsManager ?? 0)),
+          Number(b.department_specific_data?.dispatch || b.dispatch || 0) +
+          Number(b.department_specific_data?.operations_manager || b.operationsManager || 0) -
+          (Number(a.department_specific_data?.dispatch || a.dispatch || 0) +
+            Number(a.department_specific_data?.operations_manager || a.operationsManager || 0)),
       )
       .slice(0, 5) // top 5 results
       .map((c) => ({
         name: c.name,
-        dispatch: Number(c.dispatch ?? 0),
-        ops: Number(c.operationsManager ?? 0),
+        dispatch: Number(c.department_specific_data?.dispatch || c.dispatch || 0),
+        ops: Number(c.department_specific_data?.operations_manager || c.operationsManager || 0),
       }))
   }, [data])
 
@@ -604,10 +617,10 @@ export default function DashboardPage() {
                         )}
                       </TableCell>
                       <TableCell className="min-w-[80px] whitespace-nowrap">
-                        {typeof c.dispatch === "number" ? c.dispatch : "-"}
+                        {c.department_specific_data?.dispatch || c.dispatch || "-"}
                       </TableCell>
                       <TableCell className="min-w-[100px] whitespace-nowrap">
-                        {typeof c.operationsManager === "number" ? c.operationsManager : "-"}
+                        {c.department_specific_data?.operations_manager || c.operationsManager || "-"}
                       </TableCell>
                       <TableCell className="min-w-[120px] whitespace-nowrap">
                         <RecommendationBadge value={c.recommendation} />

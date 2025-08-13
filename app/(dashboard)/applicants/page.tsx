@@ -45,12 +45,11 @@ export default function ApplicantsPage() {
     setLoading(true)
     setError("")
     try {
-      const res = await fetch(WEBHOOK_URL, { cache: "no-store" })
+      const res = await fetch("/api/candidates", { cache: "no-store" })
       if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`)
-      const json = (await res.json()) as Candidate[] | { data: Candidate[] }
-      const arr = Array.isArray(json) ? json : (json as any).data
-      if (!Array.isArray(arr)) throw new Error("Unexpected response shape")
-      setData(arr.length > 0 ? arr : [])
+      const json = await res.json()
+      const arr = Array.isArray(json) ? json : json.data || []
+      setData(arr)
     } catch (e: any) {
       setError(e.message || "Failed to fetch applicants")
       setData([])
@@ -91,6 +90,32 @@ export default function ApplicantsPage() {
     setDialogTitle(title)
     setDialogItems(items)
     setDialogOpen(true)
+  }
+
+  function getDepartmentScores(candidate: Candidate) {
+    const data = candidate.department_specific_data || {}
+    const scores = []
+
+    switch (candidate.department) {
+      case "Operations":
+        if (data.dispatch) scores.push(`Dispatch: ${data.dispatch}`)
+        if (data.operations_manager) scores.push(`Ops Manager: ${data.operations_manager}`)
+        break
+      case "Maintenance":
+        if (data.maintenance_officer) scores.push(`Maintenance Officer: ${data.maintenance_officer}`)
+        break
+      case "Safety":
+        if (data.internal_safety_supervisor) scores.push(`Safety Supervisor: ${data.internal_safety_supervisor}`)
+        if (data.recruiter) scores.push(`Recruiter: ${data.recruiter}`)
+        if (data.safety_officer) scores.push(`Safety Officer: ${data.safety_officer}`)
+        if (data.recruiting_retention_officer) scores.push(`R&R Officer: ${data.recruiting_retention_officer}`)
+        break
+      case "Billing Payroll":
+        // No specific scores for this department
+        break
+    }
+
+    return scores
   }
 
   return (
@@ -256,10 +281,14 @@ export default function ApplicantsPage() {
                         )}
                       </TableCell>
                       <TableCell className="min-w-[80px] whitespace-nowrap">
-                        {typeof c.dispatch === "number" ? c.dispatch : "-"}
+                        {c.department_specific_data?.dispatch ||
+                          c.dispatch ||
+                          (c.department === "Operations" ? "-" : "N/A")}
                       </TableCell>
                       <TableCell className="min-w-[100px] whitespace-nowrap">
-                        {typeof c.operationsManager === "number" ? c.operationsManager : "-"}
+                        {c.department_specific_data?.operations_manager ||
+                          c.operationsManager ||
+                          (c.department === "Operations" ? "-" : "N/A")}
                       </TableCell>
                       <TableCell className="min-w-[120px] whitespace-nowrap">
                         <RecommendationBadge value={c.recommendation} />
