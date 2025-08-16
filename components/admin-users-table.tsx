@@ -28,7 +28,7 @@ export type UserRow = {
   created_at: string | null
 }
 
-const ROLES = ["Admin", "Manager", "HR", "Employee", "Recruiter", "Viewer", "Authenticated"] as const
+const ROLES = ["Admin", "Manager", "HR"] as const
 
 type Props = {
   initialUsers: UserRow[]

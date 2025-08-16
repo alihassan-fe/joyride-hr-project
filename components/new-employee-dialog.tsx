@@ -24,6 +24,12 @@ type Props = {
 }
 
 const ROLE_OPTIONS = ["Employee", "Manager", "Admin", "Viewer"] as const
+const DEPARTMENTS = [
+  "Operations",
+  "Maintenance",
+  "Safety",
+  "Billing Payroll",
+] as const
 
 export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
   const { toast } = useToast()
@@ -34,6 +40,10 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<(typeof ROLE_OPTIONS)[number]>("Employee")
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().slice(0, 10))
+  const [pto, setPto] = useState<number>(0)
+  const [location, setLocation] = useState("")
+  const [emergencyPhone, setEmergencyPhone] = useState("")
+  const [department, setDepartment] = useState("")
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -51,6 +61,10 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
           email: email.trim().toLowerCase(),
           role,
           start_date: new Date(startDate).toISOString(),
+          pto_balance: pto,
+          location: location.trim() || null,
+          phone: emergencyPhone.trim() || null,
+            department: department.trim() || null,
         }),
       })
       if (!res.ok) {
@@ -68,6 +82,9 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
       setEmail("")
       setRole("Employee")
       setStartDate(new Date().toISOString().slice(0, 10))
+      setPto(0)
+      setLocation("")
+      setEmergencyPhone("")
       onCreated?.()
     } finally {
       setSubmitting(false)
@@ -79,12 +96,10 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
       <DialogTrigger asChild>
         <Button className={triggerClassName}>New Employee</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Employee</DialogTitle>
-          <DialogDescription>
-            {"Create a new employee record with role and start date."}
-          </DialogDescription>
+          <DialogDescription>{"Create a new employee record with complete profile information."}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid gap-2">
@@ -120,6 +135,50 @@ export function NewEmployeeDialog({ onCreated, triggerClassName }: Props) {
           <div className="grid gap-2">
             <Label htmlFor="start">Start Date</Label>
             <Input id="start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="pto_balance">PTO Balance</Label>
+            <Input
+              id="pto_balance"
+              type="number"
+              value={pto}
+              onChange={(e) => setPto(Number(e.target.value))}
+              placeholder="0"
+            />
+          </div>
+<div className="grid gap-2">
+  <Label htmlFor="department">Department</Label>
+  <Select value={department} onValueChange={setDepartment}>
+    <SelectTrigger>
+      <SelectValue placeholder="Select department" />
+    </SelectTrigger>
+    <SelectContent>
+      {DEPARTMENTS.map((d) => (
+        <SelectItem key={d} value={d}>
+          {d}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
+          <div className="grid gap-2">
+            <Label htmlFor="location">Location</Label>
+            <Input
+              id="location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="City, Country"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="emergency_phone">Emergency Phone</Label>
+            <Input
+              id="emergency_phone"
+              type="tel"
+              value={emergencyPhone}
+              onChange={(e) => setEmergencyPhone(e.target.value)}
+              placeholder="+1 (555) 123-4567"
+            />
           </div>
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={submitting}>

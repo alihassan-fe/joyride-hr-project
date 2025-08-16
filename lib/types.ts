@@ -1,25 +1,67 @@
 export type CandidateStatus = "Call Immediatley" | "Remove" | "Shortlist";
 
 export type Candidate = {
-id: number
+  id: number
   name: string
   email: string
   phone: string
-  cv_link?: string
-  dispatch?: number
-  operations_manager?: number
-  strengths?: string[]
-  weaknesses?: string[]
-  notes?: string
-  recommendation?: CandidateStatus | null // 'Remove' | 'Consider' | undefined
+  address?: string
+  cv_link: string | null
+  cvLink?: string // <CHANGE> backward compatibility
+  dispatch: number | null
+  operations_manager: number | null
+  operationsManager?: number // <CHANGE> backward compatibility
+  strengths: string[] | null
+  weaknesses: string[] | null
+  notes: string | null
+  recommendation: CandidateStatus | null
+  created_at: string
+  department: string | null
+  department_specific_data?: {
+    // Operations department
+    dispatch?: number
+    operations_manager?: number
+    // Maintenance department
+    maintenance_officer?: number
+    // Safety department
+    internal_safety_supervisor?: number
+    recruiter?: number
+    safety_officer?: number
+    recruiting_retention_officer?: number
+    // Billing Payroll has no specific fields
+  } | null
 }
 
-export type Employee = {
+export interface Employee {
   id: string
   name: string
   email: string
   role: string
   start_date: string
+  pto_balance: number
+  location?: string
+  phone?: string
+  department?: string
+  document_count?: number
+  notes_count?: number
+}
+
+export interface Document {
+  id: number
+  document_type: string
+  file_name: string
+  file_path: string
+  file_size: number
+  uploaded_at: string
+}
+
+export interface Note {
+  id: number
+  employee_id: string
+  note: string
+  note_text: string
+  created_by: string
+  created_at: string
 }
 
 export type Event = {
@@ -32,6 +74,7 @@ export type Event = {
 }
 
 export type EventType = "holiday" | "interview" | "meeting"
+
 export type Draft = {
   id?: number
   title: string

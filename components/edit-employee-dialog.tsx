@@ -17,28 +17,37 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-
-export type EmployeeRow = {
-  id: string
-  name: string
-  email: string
-  role: string
-  start_date: string
-  pto_balance?: number
-}
+import { Employee } from "@/lib/types"
 
 type Props = {
-  employee: EmployeeRow
+  employee: Employee
   onUpdated?: () => void
   trigger?: React.ReactNode
-  open?: boolean
+    open?: boolean
   onOpenChange?: (open: boolean) => void
 }
 
-const ROLES = ["Employee", "Manager", "Admin", "Viewer"] as const
+const ROLES = ["Admin", "Manager", "HR"] as const
+const DEPARTMENTS = [
+  "Operations",
+  "Maintenance",
+  "Safety",
+  "Billing Payroll",
+] as const
 
-export default function EditEmployeeDialog({ employee, onUpdated, trigger, open, onOpenChange }: Props) {
+export default function EditEmployeeDialog({
+  employee,
+  onUpdated,
+  trigger,
+  open: controlledOpen,
+  onOpenChange,
+}: Props) {
   const { toast } = useToast()
+  // Use controlled state if provided, else fall back to internal state
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : uncontrolledOpen
+  const setOpen = isControlled && onOpenChange ? onOpenChange : setUncontrolledOpen
   const [saving, setSaving] = useState(false)
 
   const [name, setName] = useState(employee.name)
@@ -46,6 +55,9 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger, open,
   const [role, setRole] = useState<string>(employee.role || "Employee")
   const [startDate, setStartDate] = useState<string>(employee.start_date?.slice(0, 10) || "")
   const [pto, setPto] = useState<string>(String(employee.pto_balance ?? 0))
+  const [location, setLocation] = useState(employee.location || "")
+  const [emergencyPhone, setEmergencyPhone] = useState(employee.phone || "")
+  const [department, setDepartment] = useState(employee.department || "")
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -60,6 +72,9 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger, open,
           role,
           start_date: startDate ? new Date(startDate).toISOString() : null,
           pto_balance: Number.isFinite(Number(pto)) ? Number(pto) : 0,
+          location: location.trim() || null,
+          phone: emergencyPhone.trim() || null,
+            department: department.trim() || null,
         }),
       })
       if (!res.ok) {
@@ -67,7 +82,7 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger, open,
         throw new Error(j?.error || "Failed to update employee")
       }
       toast({ title: "Employee updated", description: `${name} saved successfully.` })
-      onOpenChange?.(false)
+      setOpen(false)
       onUpdated?.()
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Update failed." })
@@ -77,7 +92,7 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger, open,
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm">
@@ -85,7 +100,7 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger, open,
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit employee</DialogTitle>
           <DialogDescription>Update profile details and role.</DialogDescription>
@@ -118,12 +133,46 @@ export default function EditEmployeeDialog({ employee, onUpdated, trigger, open,
             <Label htmlFor="emp_start">Start date</Label>
             <Input id="emp_start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </div>
+    <div className="grid gap-2">
+  <Label htmlFor="emp_department">Department</Label>
+  <Select value={department} onValueChange={setDepartment}>
+    <SelectTrigger>
+      <SelectValue placeholder="Select department" />
+    </SelectTrigger>
+    <SelectContent>
+      {DEPARTMENTS.map((d) => (
+        <SelectItem key={d} value={d}>
+          {d}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
           <div className="grid gap-2">
             <Label htmlFor="emp_pto">PTO balance</Label>
             <Input id="emp_pto" type="number" value={pto} onChange={(e) => setPto(e.target.value)} />
           </div>
+          <div className="grid gap-2">
+            <Label htmlFor="emp_location">Location</Label>
+            <Input
+              id="emp_location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="City, Country"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="emp_emergency_phone">Emergency Phone</Label>
+            <Input
+              id="emp_emergency_phone"
+              type="tel"
+              value={emergencyPhone}
+              onChange={(e) => setEmergencyPhone(e.target.value)}
+              placeholder="+1 (555) 123-4567"
+            />
+          </div>
           <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange?.(false)} disabled={saving}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>

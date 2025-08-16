@@ -36,7 +36,8 @@ export default function DashboardPage() {
       setLoading(true)
       const res = await fetch("/api/candidates")
       const data = await res.json()
-      setData(data?.data ?? [])
+      console.log("data[", data)
+      setData(data ?? [])
     } finally {
       setLoading(false)
     }
@@ -479,8 +480,7 @@ const groupedBarData = useMemo(() => {
                     <TableHead className="min-w-[150px] whitespace-nowrap">Name</TableHead>
                     <TableHead className="min-w-[200px] whitespace-nowrap">Email</TableHead>
                     <TableHead className="min-w-[120px] whitespace-nowrap">Phone</TableHead>
-                    <TableHead className="min-w-[80px] whitespace-nowrap">Dispatch</TableHead>
-                    <TableHead className="min-w-[100px] whitespace-nowrap">Ops Manager</TableHead>
+                             <TableHead className="min-w-[120px] whitespace-nowrap">Department</TableHead>
                     <TableHead className="min-w-[120px] whitespace-nowrap">
                      Recommendation
                     </TableHead>
@@ -534,13 +534,16 @@ const groupedBarData = useMemo(() => {
                         <TableCell className="font-medium min-w-[150px] whitespace-nowrap">{c.name}</TableCell>
                         <TableCell className="text-neutral-600 min-w-[200px] whitespace-nowrap">{c.email}</TableCell>
                         <TableCell className="text-neutral-600 min-w-[120px] whitespace-nowrap">{c.phone}</TableCell>
-                        <TableCell className="min-w-[80px] whitespace-nowrap">
-                          {typeof c.dispatch === "number" ? c.dispatch : "-"}
-                        </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
-                          {typeof c.operations_manager === "number" ? c.operations_manager : "-"}
-                        </TableCell>
-                                                <TableCell className="min-w-[120px] whitespace-nowrap">
+                              <TableCell className="min-w-[120px] whitespace-nowrap">
+                        {c.department ? (
+                          <Badge variant="outline" className="text-xs">
+                            {c.department}
+                          </Badge>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
                           <RecommendationBadge value={c.recommendation || ""} />
                         </TableCell>
                         <TableCell className="min-w-[80px] whitespace-nowrap">

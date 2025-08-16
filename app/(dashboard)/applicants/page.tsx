@@ -28,6 +28,7 @@ export default function ApplicantsPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>("")
   const [recommendationFilter, setRecommendationFilter] = useState<string>("all")
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all")
   const [selected, setSelected] = useState<Candidate | null>(null)
 
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -43,7 +44,7 @@ export default function ApplicantsPage() {
       setLoading(true)
       const res = await fetch("/api/candidates")
       const data = await res.json()
-      setData(data?.data ?? [])
+      setData(data ?? [])
     } finally {
       setLoading(false)
     }
@@ -65,19 +66,22 @@ export default function ApplicantsPage() {
       if ((c.recommendation || "").toLowerCase() !== recommendationFilter) return false
     }
 
+      if (departmentFilter !== "all") {
+      if ((c.department || "").toLowerCase() !== departmentFilter.toLowerCase()) return false
+    }
+
     return true
   })
 
   const totalPages = Math.ceil(filteredData.length / PAGE_SIZE)
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-
+  const departments = ["Operations", "Maintenance", "Safety", "Billing Payroll"]
   function openListDialog(title: string, items: string[] = []) {
     setDialogTitle(title)
     setDialogItems(items)
     setDialogOpen(true)
   }
-  
 
   return (
     <div className="space-y-6">
@@ -138,6 +142,28 @@ export default function ApplicantsPage() {
         </SelectGroup>
       </SelectContent>
     </Select>
+     <Select
+          value={departmentFilter}
+          onValueChange={(value) => {
+            setDepartmentFilter(value)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="w-full text-sm">
+            <SelectValue placeholder="All Departments" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel>Department</SelectLabel>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map((dept) => (
+                <SelectItem key={dept} value={dept!}>
+                  {dept}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Applicants Table (mirrors Dashboard table) */}
@@ -153,8 +179,7 @@ export default function ApplicantsPage() {
                   <TableHead className="min-w-[150px] whitespace-nowrap">Name</TableHead>
                   <TableHead className="min-w-[200px] whitespace-nowrap">Email</TableHead>
                   <TableHead className="min-w-[120px] whitespace-nowrap">Phone</TableHead>
-                  <TableHead className="min-w-[80px] whitespace-nowrap">Dispatch</TableHead>
-                  <TableHead className="min-w-[100px] whitespace-nowrap">Ops Manager</TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">Department</TableHead>
                   <TableHead className="min-w-[120px] whitespace-nowrap">Recommendation
                   </TableHead>
                   <TableHead className="min-w-[80px] whitespace-nowrap">CV</TableHead>
@@ -206,13 +231,16 @@ export default function ApplicantsPage() {
                       <TableCell className="font-medium min-w-[150px] whitespace-nowrap"  onClick={() => setSelected(c)}>{c.name}</TableCell>
                       <TableCell className="text-neutral-600 min-w-[200px] whitespace-nowrap">{c.email}</TableCell>
                       <TableCell className="text-neutral-600 min-w-[120px] whitespace-nowrap">{c.phone}</TableCell>
-                      <TableCell className="min-w-[80px] whitespace-nowrap">
-                        {typeof c.dispatch === "number" ? c.dispatch : "-"}
+                         <TableCell className="min-w-[120px] whitespace-nowrap">
+                        {c.department ? (
+                          <Badge variant="outline" className="text-xs">
+                            {c.department}
+                          </Badge>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
                       </TableCell>
-                      <TableCell className="min-w-[100px] whitespace-nowrap">
-                        {typeof c.operations_manager === "number" ? c.operations_manager : "-"}
-                      </TableCell>
-                                            <TableCell className="min-w-[120px] whitespace-nowrap">
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
                         <RecommendationBadge value={c.recommendation ?? ""} />
                       </TableCell>
                       <TableCell className="min-w-[80px] whitespace-nowrap">

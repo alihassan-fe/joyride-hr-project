@@ -26,7 +26,7 @@ export async function GET() {
 
 type PostBody = { email?: string; name?: string; role?: string; password?: string }
 
-const ALLOWED_ROLES = new Set(["Admin", "Manager", "HR", "Employee", "Recruiter", "Viewer", "Authenticated"])
+const ALLOWED_ROLES = new Set(["Admin", "Manager", "HR"])
 
 export async function POST(req: Request) {
   const session = await auth()

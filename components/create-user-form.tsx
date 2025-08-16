@@ -9,13 +9,13 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 
-const ROLES = ["Admin", "Manager", "Recruiter", "Viewer"] as const
+const ROLES = ["Admin", "Manager", "HR"] as const
 
 export function CreateUserForm() {
   const { toast } = useToast()
   const [email, setEmail] = useState("")
   const [name, setName] = useState("")
-  const [role, setRole] = useState<(typeof ROLES)[number]>("Viewer")
+  const [role, setRole] = useState<(typeof ROLES)[number]>("Admin")
   const [password, setPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,7 +47,7 @@ export function CreateUserForm() {
       toast({ title: "User created", description: `${data.data.email} (${data.data.role})` })
       setEmail("")
       setName("")
-      setRole("Viewer")
+      setRole("Admin")
       setPassword("")
     } catch (err) {
       setError("Network error. Please try again.")

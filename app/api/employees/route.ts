@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth-next"
 export async function GET() {
   const sql = getSql()
   const rows = await sql /* sql */`
-    SELECT id, name, email, role, start_date, pto_balance
+    SELECT id, name, email, role, start_date, pto_balance, location, phone, department
     FROM employees
     ORDER BY start_date DESC
   `
@@ -13,25 +13,21 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  const role = (session?.user as any)?.role
-  if (role !== "Admin") {
-    return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 })
-  }
-
   const sql = getSql()
-  const body = await req.json().catch(() => null)
-  if (!body?.name || !body?.email || !body?.role) {
-    return NextResponse.json({ error: "name, email, role required" }, { status: 400 })
-  }
-
-  const start = body.start_date ? new Date(body.start_date).toISOString() : new Date().toISOString()
-  const pto = Number.isFinite(Number(body.pto_balance)) ? Number(body.pto_balance) : 0
-
+  const body = await req.json()
   const [row] = await sql /* sql */`
-    INSERT INTO employees (name, email, role, start_date, pto_balance)
-    VALUES (${body.name}, ${body.email}, ${body.role}, ${start}, ${pto})
-    RETURNING id, name, email, role, start_date, pto_balance
+    INSERT INTO employees (name, email, role, start_date, pto_balance, location, phone, department)
+    VALUES (
+      ${body.name},
+      ${body.email},
+      ${body.role},
+      ${body.start_date},
+      ${body.pto_balance},
+      ${body.location},
+      ${body.phone},
+      ${body.department}
+    )
+    RETURNING id, name, email, role, start_date, pto_balance, location, phone, department
   `
   return NextResponse.json({ data: row })
 }

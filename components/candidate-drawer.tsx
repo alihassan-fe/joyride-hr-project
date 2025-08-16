@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
-import { CheckCircle2, FileText, User, X } from 'lucide-react'
-import type { Candidate, CandidateStatus } from "@/lib/types"
+import { CheckCircle2, FileText, User, X } from "lucide-react"
+import type { Candidate, CanditateStatus } from "@/lib/types"
 
 type Props = {
   candidate?: Candidate | null
@@ -17,19 +17,15 @@ type Props = {
   onUpdated?: () => Promise<void> | void
 }
 
-export function CandidateDrawer({
-  candidate = null,
-  onClose = () => {},
-  onUpdated = async () => {},
-}: Props) {
+export function CandidateDrawer({ candidate = null, onClose = () => {}, onUpdated = async () => {} }: Props) {
   const [notes, setNotes] = React.useState("")
   const [saving, setSaving] = React.useState(false)
-  console.log("candia", candidate)
+
   React.useEffect(() => {
     setNotes(candidate?.notes || "")
   }, [candidate])
 
-  async function updateRecommendation(rec: CandidateStatus) {
+  async function updateRecommendation(rec: CandidateRecommendation) {
     if (!candidate) return
     setSaving(true)
     try {
@@ -65,14 +61,98 @@ export function CandidateDrawer({
     }
   }
 
-  const recommendationOrder: CandidateStatus[] = [
-    "Call Immediatley",
-    "Remove",
-    "Shortlist",
-  ]
+  const getScoreBadgeVariant = (score: number) => {
+    if (score >= 7) return "default" // Green for high scores
+    if (score >= 4) return "secondary" // Gray for medium scores
+    return "destructive" // Red for low scores
+  }
+
+  const renderDepartmentScores = () => {
+    if (!candidate?.department_specific_data) return null
+
+    const data = candidate.department_specific_data
+    const department = candidate.department
+
+    if (department === "Operations") {
+      return (
+        <>
+          {data.dispatch !== undefined && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Dispatch</span>
+              <Badge variant={getScoreBadgeVariant(data.dispatch)}>{data.dispatch}/10</Badge>
+            </div>
+          )}
+          {data.operations_manager !== undefined && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Operations Manager</span>
+              <Badge variant={getScoreBadgeVariant(data.operations_manager)}>{data.operations_manager}/10</Badge>
+            </div>
+          )}
+        </>
+      )
+    }
+
+    if (department === "Safety") {
+      return (
+        <>
+          {data.internal_safety_supervisor !== undefined && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Internal Safety Supervisor</span>
+              <Badge variant={getScoreBadgeVariant(data.internal_safety_supervisor)}>
+                {data.internal_safety_supervisor}/10
+              </Badge>
+            </div>
+          )}
+          {data.recruiter !== undefined && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Recruiter</span>
+              <Badge variant={getScoreBadgeVariant(data.recruiter)}>{data.recruiter}/10</Badge>
+            </div>
+          )}
+          {data.safety_officer !== undefined && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Safety Officer</span>
+              <Badge variant={getScoreBadgeVariant(data.safety_officer)}>{data.safety_officer}/10</Badge>
+            </div>
+          )}
+          {data.recruiting_retention_officer !== undefined && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Recruiting & Retention Officer</span>
+              <Badge variant={getScoreBadgeVariant(data.recruiting_retention_officer)}>
+                {data.recruiting_retention_officer}/10
+              </Badge>
+            </div>
+          )}
+        </>
+      )
+    }
+
+    if (department === "Maintenance") {
+      return (
+        <>
+          {data.maintenance_officer !== undefined && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Maintenance Officer</span>
+              <Badge variant={getScoreBadgeVariant(data.maintenance_officer)}>{data.maintenance_officer}/10</Badge>
+            </div>
+          )}
+        </>
+      )
+    }
+
+    // Billing Payroll has no specific scores
+    return null
+  }
+
+  const recommendationOrder: CandidateRecommendation[] = ["Call Immediatley", "Remove", "Shortlist"]
 
   return (
-    <Sheet open={!!candidate} onOpenChange={(o) => { if (!o) onClose() }}>
+    <Sheet
+      open={!!candidate}
+      onOpenChange={(o) => {
+        if (!o) onClose()
+      }}
+    >
       <SheetContent className="w-full sm:max-w-xl">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
@@ -86,6 +166,12 @@ export function CandidateDrawer({
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-neutral-500">Recommendation</span>
               <Badge variant="secondary">{candidate.recommendation}</Badge>
+              {candidate.department && (
+                <>
+                  <span className="text-sm text-neutral-500">Department</span>
+                  <Badge variant="outline">{candidate.department}</Badge>
+                </>
+              )}
             </div>
 
             <Separator />
@@ -94,13 +180,28 @@ export function CandidateDrawer({
               <div className="text-sm text-neutral-500">Contact</div>
               <div className="text-sm">{candidate.email}</div>
               <div className="text-sm">{candidate.phone}</div>
+              {candidate.address && <div className="text-sm">{candidate.address}</div>}
             </div>
+
+            {candidate.department_specific_data && Object.keys(candidate.department_specific_data).length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <div className="text-sm text-neutral-500">Department Scores</div>
+                  <div className="space-y-2">{renderDepartmentScores()}</div>
+                </div>
+              </>
+            )}
+
+            <Separator />
 
             <div className="space-y-2">
               <div className="text-sm text-neutral-500">Strengths</div>
               <ul className="flex flex-wrap gap-2">
-                {(candidate?.strengths || []).map((s, i) => (
-                  <li key={i} className="text-sm">{s}</li>
+                {(candidate.strengths || []).map((s, i) => (
+                  <li key={i} className="text-sm">
+                    {s}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -108,8 +209,10 @@ export function CandidateDrawer({
             <div className="space-y-2">
               <div className="text-sm text-neutral-500">Weaknesses</div>
               <ul className="list-disc pl-5 space-y-1">
-                {(candidate?.weaknesses || []).map((w, i) => (
-                  <li key={i} className="text-sm">{w}</li>
+                {(candidate.weaknesses || []).map((w, i) => (
+                  <li key={i} className="text-sm">
+                    {w}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -141,7 +244,7 @@ export function CandidateDrawer({
                 {recommendationOrder.map((rec) => (
                   <Button
                     key={rec}
-                    variant={rec === candidate.recommendation ? "destructive" : "secondary"}
+                    variant={"secondary"}
                     className={"bg-neutral-100 text-neutral-900 hover:bg-neutral-200"}
                     onClick={() => updateRecommendation(rec)}
                     disabled={saving}

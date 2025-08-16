@@ -25,7 +25,7 @@ export async function PATCH(req: Request, context: { params: { id: string } }) {
   const password = body.password ? body.password.trim() : null
 
   // Optional: basic role allow-list; expand to align with UI
-  const ALLOWED_ROLES = new Set(["Admin", "Manager", "HR", "Employee", "Recruiter", "Viewer", "Authenticated"])
+  const ALLOWED_ROLES = new Set(["Admin", "Manager", "HR"])
   if (role && !ALLOWED_ROLES.has(role)) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 })
   }
