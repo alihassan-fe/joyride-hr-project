@@ -89,39 +89,50 @@ export default function DashboardPage() {
     setDialogOpen(true)
   }
 
+  const truncate = (str: string, max: number) =>
+  str.length > max ? str.slice(0, max) + "..." : str
+
   // Score comparison for existing ECharts line
-  const lineChartOption = useMemo(() => {
-    const names = data.map((c) => c.name)
-    const dispatchScores = data.map((c) => Number(c.dispatch ?? 0))
-    const opsScores = data.map((c) => Number(c.operations_manager ?? 0))
-    return {
-      tooltip: { trigger: "axis" },
-      legend: { data: ["Dispatch", "Ops Manager"] },
-      grid: { left: 40, right: 20, bottom: 40, top: 40, containLabel: true },
-      xAxis: { type: "category", data: names, axisLabel: { interval: 0, rotate: names.length > 6 ? 30 : 0 } },
-      yAxis: { type: "value", min: 0 },
-      series: [
-        {
-          name: "Dispatch",
-          type: "line",
-          data: dispatchScores,
-          itemStyle: { color: "#f59e0b" },
-          lineStyle: { color: "#f59e0b" },
-          symbol: "circle",
-          symbolSize: 6,
-        },
-        {
-          name: "Ops Manager",
-          type: "line",
-          data: opsScores,
-          itemStyle: { color: "#10b981" },
-          lineStyle: { color: "#10b981" },
-          symbol: "circle",
-          symbolSize: 6,
-        },
-      ],
-    }
-  }, [data])
+const lineChartOption = useMemo(() => {
+  // take only the last 10 entries
+  const latest = data.slice(-12)
+
+  const names = latest.map((c) => truncate(c.name, 8))
+  const dispatchScores = latest.map((c) => Number(c.dispatch ?? 0))
+  const opsScores = latest.map((c) => Number(c.operations_manager ?? 0))
+
+  return {
+    tooltip: { trigger: "axis" },
+    legend: { data: ["Dispatch", "Ops Manager"] },
+    grid: { left: 40, right: 20, bottom: 40, top: 40, containLabel: true },
+    xAxis: {
+      type: "category",
+      data: names,
+      axisLabel: { interval: 0, rotate: 0 },
+    },
+    yAxis: { type: "value", min: 0 },
+    series: [
+      {
+        name: "Dispatch",
+        type: "line",
+        data: dispatchScores,
+        itemStyle: { color: "#f59e0b" },
+        lineStyle: { color: "#f59e0b" },
+        symbol: "circle",
+        symbolSize: 6,
+      },
+      {
+        name: "Ops Manager",
+        type: "line",
+        data: opsScores,
+        itemStyle: { color: "#10b981" },
+        lineStyle: { color: "#10b981" },
+        symbol: "circle",
+        symbolSize: 6,
+      },
+    ],
+  }
+}, [data])
 
   // Stats
   const stats = useMemo(() => {
@@ -152,7 +163,7 @@ const groupedBarData = useMemo(() => {
     )
     .slice(0, 5) // top 5 results
     .map((c) => ({
-      name: c.name,
+      name: truncate(c.name, 12),
       dispatch: Number(c.dispatch ?? 0),
       ops: Number(c.operations_manager ?? 0),
     }));

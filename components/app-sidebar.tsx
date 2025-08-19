@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Bot, Calendar, FileText, LayoutDashboard, LogOut, Megaphone, UserPlus, Users, User } from "lucide-react"
+import { Bot, Calendar, FileText, LayoutDashboard, LogOut, Megaphone, UserPlus, Users, User, MapIcon as Sitemap } from "lucide-react"
 import { signOut } from "next-auth/react"
 
 type Props = {
@@ -29,6 +29,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/applicants", label: "Applicants", icon: FileText },
   { href: "/employees", label: "Employees", icon: Users },
+  { href: "/org-chart", label: "Org Chart", icon: Sitemap },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/profile", label: "Profile", icon: User },
 ]

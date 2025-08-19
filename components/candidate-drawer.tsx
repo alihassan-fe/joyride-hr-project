@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { CheckCircle2, FileText, User, X } from "lucide-react"
-import type { Candidate, CanditateStatus } from "@/lib/types"
+import type { Candidate, CandidateStatus } from "@/lib/types"
 
 type Props = {
   candidate?: Candidate | null
@@ -25,7 +25,7 @@ export function CandidateDrawer({ candidate = null, onClose = () => {}, onUpdate
     setNotes(candidate?.notes || "")
   }, [candidate])
 
-  async function updateRecommendation(rec: CandidateRecommendation) {
+  async function updateRecommendation(rec: CandidateStatus) {
     if (!candidate) return
     setSaving(true)
     try {
@@ -144,7 +144,7 @@ export function CandidateDrawer({ candidate = null, onClose = () => {}, onUpdate
     return null
   }
 
-  const recommendationOrder: CandidateRecommendation[] = ["Call Immediatley", "Remove", "Shortlist"]
+  const recommendationOrder: CandidateStatus[] = ["Call Immediatley", "Remove", "Shortlist"]
 
   return (
     <Sheet

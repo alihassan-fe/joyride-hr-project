@@ -44,6 +44,12 @@ export interface Employee {
   department?: string
   document_count?: number
   notes_count?: number
+  // new fields
+  job_title?: string
+  manager_id?: string
+  office_location?: string
+  employment_status: string
+  team_id?: string
 }
 
 export interface Document {
@@ -103,4 +109,24 @@ export type OutboxItem = {
     html?: string
     ics?: string
   }
+}
+
+export type OrgNode = {
+  id: string
+  name: string
+  value: string
+  children?: OrgNode[]
+  symbolSize?: number
+  itemStyle?: { color: string }
+  label?: { show: boolean }
+  category?: number
+  collapsed?: boolean
+}
+
+export type Team = {
+  id: string
+  name: string
+  department: string
+  team_lead_id?: string
+  location?: string
 }
