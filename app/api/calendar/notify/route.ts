@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     const subject =
       subjectOverride || (event.type === "interview" ? `Interview: ${event.title}` : `Invitation: ${event.title}`)
 
-    // Optional rendering so your n8n workflow can attach an email/ICS right away
+    // Enhanced email rendering with Google Meet and attendees
     const html = renderEventEmailHTML({
       title: event.title,
       type: event.type,
@@ -61,7 +61,9 @@ export async function POST(req: Request) {
       startISO: event.start_time,
       endISO: event.end_time,
       videoLink: meta.videoLink,
+      googleMeetLink: meta.googleMeetLink,
       message,
+      attendees: recipients,
     })
 
     const ics = createEventICS({
@@ -109,6 +111,7 @@ export async function POST(req: Request) {
       event,
       html,
       ics,
+      googleMeetLink: meta.googleMeetLink,
     }
 
     let messageId: string | null = null

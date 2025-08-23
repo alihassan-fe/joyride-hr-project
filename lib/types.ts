@@ -1,5 +1,16 @@
 export type CandidateStatus = "Call Immediatley" | "Remove" | "Shortlist";
 
+// New types for candidate status management
+export interface CandidateStatusOption {
+  id: number
+  name: string
+  color: string
+  is_default: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
 export type Candidate = {
   id: number
   name: string
@@ -17,6 +28,9 @@ export type Candidate = {
   recommendation: CandidateStatus | null
   created_at: string
   department: string | null
+  // New fields for status management
+  status_id?: number
+  status?: CandidateStatusOption
   department_specific_data?: {
     // Operations department
     dispatch?: number
@@ -50,6 +64,55 @@ export interface Employee {
   office_location?: string
   employment_status: string
   team_id?: string
+  // New field for performance tracking
+  current_performance_score?: number
+}
+
+// New types for employee performance tracking
+export interface EmployeePerformance {
+  id: number
+  employee_id: string
+  score: number
+  performance_date: string
+  notes?: string
+  created_by?: string
+  created_at: string
+  updated_at: string
+  documents?: EmployeePerformanceDocument[]
+}
+
+export interface EmployeePerformanceDocument {
+  id: number
+  performance_id: number
+  document_type: string
+  file_name: string
+  file_path: string
+  file_size: number
+  uploaded_at: string
+}
+
+// New types for shift management
+export interface ShiftType {
+  id: number
+  name: string
+  start_time: string
+  end_time: string
+  color: string
+  description?: string
+  created_at: string
+}
+
+export interface EmployeeShift {
+  id: number
+  employee_id: string
+  shift_type_id: number
+  shift_date: string
+  notes?: string
+  assigned_by?: string
+  created_at: string
+  updated_at: string
+  shift_type?: ShiftType
+  employee?: Employee
 }
 
 export interface Document {

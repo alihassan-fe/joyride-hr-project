@@ -13,8 +13,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, Download } from "lucide-react"
+import { Trash2, Download, Video, Calendar, Mail, ExternalLink, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { SearchableAutocomplete } from "@/components/searchable-autocomplete"
 
 type EventType = "pto" | "holiday" | "interview"
 
@@ -31,6 +32,8 @@ type CalendarEvent = {
   candidateEmail?: string
   panelEmails?: string
   videoLink?: string
+  googleMeetLink?: string
+  googleCalendarId?: string
 }
 
 type OutboxEntry = {
@@ -49,6 +52,16 @@ type OutboxEntry = {
   }
 }
 
+type SearchResult = {
+  type: "candidate" | "employee"
+  id: number | string
+  name: string
+  email: string
+  phone?: string
+  department?: string
+  role?: string
+}
+
 const parseCsv = (str: string): string[] => {
   return str
     .split(",")
@@ -58,12 +71,16 @@ const parseCsv = (str: string): string[] => {
 
 export default function CalendarBoard() {
   const [events, setEvents] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [draft, setDraft] = useState<CalendarEvent | null>(null)
   const [outbox, setOutbox] = useState<OutboxEntry[]>([])
+  const [selectedAttendees, setSelectedAttendees] = useState<SearchResult[]>([])
+  const [generatingMeetLink, setGeneratingMeetLink] = useState(false)
+  const [syncingGoogleCalendar, setSyncingGoogleCalendar] = useState(false)
   const { toast } = useToast()
   const webhookUrl = process.env.N8N_WEBHOOK_URL || "https://oriormedia.app.n8n.cloud/webhook/calender-invite"
+
   const fetchEvents = useCallback(async () => {
     try {
       const res = await fetch("/api/calendar/events")
@@ -137,6 +154,7 @@ export default function CalendarBoard() {
       allDay: selectInfo.allDay,
     }
     setDraft(newEvent)
+    setSelectedAttendees([])
     setDialogOpen(true)
   }
 
@@ -157,7 +175,23 @@ export default function CalendarBoard() {
       candidateEmail: meta.candidateEmail || "",
       panelEmails: Array.isArray(meta.panelEmails) ? meta.panelEmails.join(", ") : "",
       videoLink: meta.videoLink || "",
+      googleMeetLink: meta.googleMeetLink || "",
+      googleCalendarId: meta.googleCalendarId || "",
     })
+    
+    // Convert existing attendees to SearchResult format
+    const existingAttendees: SearchResult[] = []
+    if (meta.attendees) {
+      meta.attendees.forEach((email: string) => {
+        existingAttendees.push({
+          type: "employee",
+          id: email,
+          name: email.split('@')[0],
+          email: email
+        })
+      })
+    }
+    setSelectedAttendees(existingAttendees)
     setDialogOpen(true)
   }
 
@@ -188,6 +222,103 @@ export default function CalendarBoard() {
     }
   }
 
+  const generateGoogleMeetLink = async () => {
+    if (!draft?.title || !draft?.start || !draft?.end) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in title, start time, and end time first",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setGeneratingMeetLink(true)
+    try {
+      const attendeeEmails = selectedAttendees.map(attendee => attendee.email)
+      
+      const response = await fetch("/api/calendar/google-meet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: draft.title,
+          start_time: draft.start,
+          end_time: draft.end,
+          attendees: attendeeEmails
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setDraft(prev => prev ? {
+          ...prev,
+          googleMeetLink: data.meetLink,
+          location: data.meetLink
+        } : null)
+        
+        toast({
+          title: "Success",
+          description: "Google Meet link generated successfully",
+        })
+      } else {
+        throw new Error("Failed to generate Google Meet link")
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate Google Meet link",
+        variant: "destructive",
+      })
+    } finally {
+      setGeneratingMeetLink(false)
+    }
+  }
+
+  const syncWithGoogleCalendar = async () => {
+    if (!draft?.id) {
+      toast({
+        title: "Error",
+        description: "Please save the event first",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSyncingGoogleCalendar(true)
+    try {
+      const response = await fetch("/api/calendar/google-calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id: draft.id,
+          action: draft.googleCalendarId ? "update" : "create"
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setDraft(prev => prev ? {
+          ...prev,
+          googleCalendarId: data.googleCalendarEventId
+        } : null)
+        
+        toast({
+          title: "Success",
+          description: data.message,
+        })
+      } else {
+        throw new Error("Failed to sync with Google Calendar")
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to sync with Google Calendar",
+        variant: "destructive",
+      })
+    } finally {
+      setSyncingGoogleCalendar(false)
+    }
+  }
+
   const upsertEvent = async () => {
     if (!draft?.title.trim()) {
       toast({
@@ -199,11 +330,15 @@ export default function CalendarBoard() {
     }
 
     try {
+      const attendeeEmails = selectedAttendees.map(attendee => attendee.email)
+      
       const meta = {
-        attendees: draft.attendees ? parseCsv(draft.attendees) : [],
+        attendees: attendeeEmails,
         candidateEmail: draft.candidateEmail || undefined,
         panelEmails: draft.panelEmails ? parseCsv(draft.panelEmails) : [],
         videoLink: draft.videoLink || undefined,
+        googleMeetLink: draft.googleMeetLink || undefined,
+        googleCalendarId: draft.googleCalendarId || undefined,
       }
 
       const payload = {
@@ -262,6 +397,7 @@ export default function CalendarBoard() {
       await fetchEvents()
       setDialogOpen(false)
       setDraft(null)
+      setSelectedAttendees([])
       toast({
         title: "Success",
         description: "Event deleted successfully",
@@ -276,32 +412,29 @@ export default function CalendarBoard() {
   }
 
   const sendInvites = async () => {
-    console.log("Sending invites...")
     if (!draft?.id) {
-      console.log("first")
       toast({
         title: "Error",
         description: "Please save the event first",
         variant: "destructive",
       })
-      return console.log("first")
+      return
     }
 
     try {
       const recipients = [
-        ...(draft.attendees ? parseCsv(draft.attendees) : []),
+        ...selectedAttendees.map(attendee => attendee.email),
         ...(draft.candidateEmail ? [draft.candidateEmail] : []),
         ...(draft.panelEmails ? parseCsv(draft.panelEmails) : []),
       ].filter(Boolean)
 
       if (recipients.length === 0) {
-          console.log("third")
         toast({
           title: "Error",
           description: "No recipients found. Add attendees, candidate email, or panel emails.",
           variant: "destructive",
         })
-        return   console.log("third")
+        return
       }
 
       const res = await fetch("/api/calendar/notify", {
@@ -330,14 +463,7 @@ export default function CalendarBoard() {
         description: error.message,
         variant: "destructive",
       })
-        console.log("error", error)
     }
-  }
-
-  const generateVideoLink = () => {
-    if (!draft) return
-    const meetingId = Math.random().toString(36).substring(2, 15)
-    setDraft({ ...draft, videoLink: `https://meet.joyride-hr.com/${meetingId}` })
   }
 
   const downloadICS = (entry: OutboxEntry) => {
@@ -355,14 +481,20 @@ export default function CalendarBoard() {
     URL.revokeObjectURL(url)
   }
 
+  const openGoogleMeet = () => {
+    if (draft?.googleMeetLink) {
+      window.open(draft.googleMeetLink, '_blank')
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Calendar */}
       <Card>
-            <CardHeader >
-                    <CardTitle>Calender</CardTitle>
-                    <p className="text-sm text-muted-foreground">{"Manage your Schedule"}</p>
-                </CardHeader>
+        <CardHeader>
+          <CardTitle>Calendar</CardTitle>
+          <p className="text-sm text-muted-foreground">Manage your Schedule</p>
+        </CardHeader>
         <CardContent className="p-6">
           {loading ? (
             <div className="flex items-center justify-center h-96">
@@ -430,7 +562,7 @@ export default function CalendarBoard() {
 
       {/* Event Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="!max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="!max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{draft?.id ? "Edit Event" : "Create Event"}</DialogTitle>
           </DialogHeader>
@@ -473,22 +605,31 @@ export default function CalendarBoard() {
               </div>
 
               <div>
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  value={draft.location || ""}
-                  onChange={(e) => setDraft({ ...draft, location: e.target.value })}
-                  placeholder="Meeting location or video link"
-                />
+                <Label htmlFor="location">Location / Video Link</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="location"
+                    value={draft.location || ""}
+                    onChange={(e) => setDraft({ ...draft, location: e.target.value })}
+                    placeholder="Meeting location or video link"
+                  />
+                  {draft.googleMeetLink && (
+                    <Button variant="outline" onClick={openGoogleMeet}>
+                      <Video className="h-4 w-4 mr-2" />
+                      Open Meet
+                    </Button>
+                  )}
+                </div>
               </div>
 
+              {/* Attendees Search */}
               <div>
-                <Label htmlFor="attendees">Attendees (comma-separated emails)</Label>
-                <Input
-                  id="attendees"
-                  value={draft.attendees || ""}
-                  onChange={(e) => setDraft({ ...draft, attendees: e.target.value })}
-                  placeholder="john@company.com, jane@company.com"
+                <Label>Attendees</Label>
+                <SearchableAutocomplete
+                  placeholder="Search candidates and employees..."
+                  onSelectionChange={setSelectedAttendees}
+                  selectedItems={selectedAttendees}
+                  maxItems={15}
                 />
               </div>
 
@@ -513,23 +654,46 @@ export default function CalendarBoard() {
                       placeholder="interviewer1@company.com, interviewer2@company.com"
                     />
                   </div>
-
-                  <div>
-                    <Label htmlFor="videoLink">Video Link</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="videoLink"
-                        value={draft.videoLink || ""}
-                        onChange={(e) => setDraft({ ...draft, videoLink: e.target.value })}
-                        placeholder="https://meet.google.com/abc-def-ghi"
-                      />
-                      <Button type="button" variant="outline" onClick={generateVideoLink}>
-                        Generate
-                      </Button>
-                    </div>
-                  </div>
                 </>
               )}
+
+              {/* Google Meet Integration */}
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={generateGoogleMeetLink}
+                  disabled={generatingMeetLink || !draft.title || !draft.start || !draft.end}
+                >
+                  <Video className="h-4 w-4 mr-2" />
+                  {generatingMeetLink ? "Generating..." : "Generate Google Meet"}
+                </Button>
+                {draft.googleMeetLink && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Video className="h-3 w-3" />
+                    Meet Link Ready
+                  </Badge>
+                )}
+              </div>
+
+              {/* Google Calendar Sync */}
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={syncWithGoogleCalendar}
+                  disabled={syncingGoogleCalendar || !draft.id}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {syncingGoogleCalendar ? "Syncing..." : "Sync to Google Calendar"}
+                </Button>
+                {draft.googleCalendarId && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Synced to Google Calendar
+                  </Badge>
+                )}
+              </div>
             </div>
           )}
 
@@ -548,7 +712,8 @@ export default function CalendarBoard() {
               </Button>
               <Button onClick={upsertEvent}>{draft?.id ? "Update" : "Create"}</Button>
               <Button onClick={sendInvites} disabled={!draft?.id} variant="secondary">
-                Trigger Invites
+                <Mail className="h-4 w-4 mr-2" />
+                Send Invites
               </Button>
             </div>
           </DialogFooter>

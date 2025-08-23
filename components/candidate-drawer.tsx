@@ -7,17 +7,26 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { CheckCircle2, FileText, User, X } from "lucide-react"
-import type { Candidate, CandidateStatus } from "@/lib/types"
+import type { Candidate, CandidateStatus, CandidateStatusOption } from "@/lib/types"
 
 type Props = {
   candidate?: Candidate | null
+  statuses?: CandidateStatusOption[]
   onClose?: () => void
   onUpdated?: () => Promise<void> | void
+  onStatusChange?: (candidateId: number, newStatusId: number) => Promise<void>
 }
 
-export function CandidateDrawer({ candidate = null, onClose = () => {}, onUpdated = async () => {} }: Props) {
+export function CandidateDrawer({ 
+  candidate = null, 
+  statuses = [], 
+  onClose = () => {}, 
+  onUpdated = async () => {},
+  onStatusChange = async () => {}
+}: Props) {
   const [notes, setNotes] = React.useState("")
   const [saving, setSaving] = React.useState(false)
 
@@ -37,6 +46,17 @@ export function CandidateDrawer({ candidate = null, onClose = () => {}, onUpdate
       if (!res.ok) {
         console.error("Failed to update recommendation", await res.text())
       }
+    } finally {
+      setSaving(false)
+      await onUpdated()
+    }
+  }
+
+  async function updateStatus(newStatusId: number) {
+    if (!candidate) return
+    setSaving(true)
+    try {
+      await onStatusChange(candidate.id, newStatusId)
     } finally {
       setSaving(false)
       await onUpdated()
@@ -164,8 +184,16 @@ export function CandidateDrawer({ candidate = null, onClose = () => {}, onUpdate
         {!candidate ? null : (
           <div className="space-y-6 px-5 overflow-auto">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-neutral-500">Recommendation</span>
-              <Badge variant="secondary">{candidate.recommendation}</Badge>
+              <span className="text-sm text-neutral-500">Status</span>
+              {candidate.status ? (
+                <Badge 
+                  style={{ backgroundColor: candidate.status.color, color: 'white' }}
+                >
+                  {candidate.status.name}
+                </Badge>
+              ) : (
+                <Badge variant="secondary">{candidate.recommendation}</Badge>
+              )}
               {candidate.department && (
                 <>
                   <span className="text-sm text-neutral-500">Department</span>
@@ -240,6 +268,37 @@ export function CandidateDrawer({ candidate = null, onClose = () => {}, onUpdate
 
             <div className="space-y-2">
               <div className="text-sm text-neutral-500">Actions</div>
+              
+              {/* Status Change */}
+              {statuses.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="status-change">Change Status</Label>
+                  <Select 
+                    value={candidate.status_id?.toString() || ""} 
+                    onValueChange={(value) => updateStatus(parseInt(value))}
+                    disabled={saving}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statuses.map((status) => (
+                        <SelectItem key={status.id} value={status.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: status.color }}
+                            />
+                            {status.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Legacy Recommendation Actions */}
               <div className="grid grid-cols-2 gap-2">
                 {recommendationOrder.map((rec) => (
                   <Button
@@ -254,6 +313,7 @@ export function CandidateDrawer({ candidate = null, onClose = () => {}, onUpdate
                   </Button>
                 ))}
               </div>
+              
               {candidate.cv_link && (
                 <a
                   href={candidate.cv_link}

@@ -45,7 +45,6 @@ export default function OrgChartPage() {
     teams: teams.length,
     locations: [...new Set(employees.map((e) => e.office_location).filter(Boolean))].length,
     managers: employees.filter((e) => employees.some((emp) => emp.manager_id === e.id)).length,
-    vacantPositions: 0,
   }
 
   useEffect(() => {
@@ -75,7 +74,9 @@ export default function OrgChartPage() {
       setLoading(false)
     }
   }
-
+  console.log("employeesRes", employees)
+  console.log("teamsRes", teams)
+  
   const handleSearch = useCallback(
     (term: string) => {
       setSearchTerm(term)
@@ -600,7 +601,7 @@ export default function OrgChartPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Card className="rounded-2xl shadow-md">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -652,15 +653,6 @@ export default function OrgChartPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.managers}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl shadow-md">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Vacant</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.vacantPositions}</div>
           </CardContent>
         </Card>
       </div>

@@ -3,16 +3,17 @@ import { notFound } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, User, Mail, Calendar, Clock, MapPin, Phone } from "lucide-react"
+import { ArrowLeft, User, Mail, Calendar, Clock, MapPin, Phone, Star } from "lucide-react"
 import Link from "next/link"
 import { Employee, Document, Note } from "@/lib/types"
 import EmployeeDocumentsAndNotes from "@/components/EmployeeDocumentsAndNotes"
+import { EmployeePerformance } from "@/components/employee-performance"
 
 // department file_path note
 async function getEmployee(id: string): Promise<Employee | null> {
   try {
     const result = await sql`
-      SELECT id, name, email, role, start_date, pto_balance, location, phone 
+      SELECT id, name, email, role, start_date, pto_balance, location, phone, department, current_performance_score
       FROM employees 
       WHERE id = ${id}
     `
@@ -85,6 +86,12 @@ export default async function EmployeeProfilePage({ params }: { params: { id: st
       return `${years} year${years > 1 ? "s" : ""}, ${months} month${months > 1 ? "s" : ""}`
     }
     return `${months} month${months > 1 ? "s" : ""}`
+  }
+
+  const getScoreColor = (score: number) => {
+    if (score >= 8) return "bg-green-100 text-green-800"
+    if (score >= 6) return "bg-yellow-100 text-yellow-800"
+    return "bg-red-100 text-red-800"
   }
 
   return (
@@ -179,18 +186,42 @@ export default async function EmployeeProfilePage({ params }: { params: { id: st
           </div>
 
           <div className="mt-6 pt-6 border-t">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Calendar className="h-4 w-4 text-primary" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* PTO Balance */}
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Calendar className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">PTO Balance</p>
+                  <p className="text-lg font-semibold">{employee.pto_balance} days</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium">PTO Balance</p>
-                <p className="text-lg font-semibold">{employee.pto_balance} days</p>
-              </div>
+
+              {/* Current Performance Score */}
+              {employee.current_performance_score !== undefined && (
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Star className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Current Performance</p>
+                    <Badge className={`text-lg font-semibold ${getScoreColor(employee.current_performance_score)}`}>
+                      {employee.current_performance_score}/10
+                    </Badge>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
       </Card> 
+
+      {/* Performance Tracking */}
+      <EmployeePerformance
+        employeeId={params.id}
+        currentScore={employee.current_performance_score}
+      />
 
       {/* Documents and Notes Grid */}
         <EmployeeDocumentsAndNotes
