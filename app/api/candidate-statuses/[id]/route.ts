@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSql } from "@/lib/sql"
+import { auth } from "@/lib/auth-next"
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await auth()
+  if (!session?.user || (session.user as any)?.role !== "Admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
   const sql = getSql()
   try {
     const statusId = Number.parseInt(params.id, 10)
@@ -51,6 +57,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await auth()
+  if (!session?.user || (session.user as any)?.role !== "Admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
   const sql = getSql()
   try {
     const statusId = Number.parseInt(params.id, 10)

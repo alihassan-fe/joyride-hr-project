@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Upload, FileText, Trash2, Download } from "lucide-react"
+import { Upload, FileText, Trash2, Download, Cloud } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 const DOCUMENT_TYPES = [
@@ -53,6 +53,18 @@ export function DocumentUpload({ employeeId, documents, onDocumentChange }: Docu
         })
         return
       }
+
+      // Check file size (max 10MB)
+      const maxSize = 10 * 1024 * 1024 // 10MB
+      if (file.size > maxSize) {
+        toast({
+          title: "File too large",
+          description: "File size must be less than 10MB",
+          variant: "destructive",
+        })
+        return
+      }
+
       setSelectedFile(file)
     }
   }
@@ -79,16 +91,17 @@ export function DocumentUpload({ employeeId, documents, onDocumentChange }: Docu
       })
 
       if (response.ok) {
+        const result = await response.json()
         toast({
           title: "Success",
-          description: "Document uploaded successfully",
+          description: "Document uploaded successfully to cloud storage",
         })
         setSelectedFile(null)
         setSelectedType("")
         onDocumentChange()
       } else {
         const error = await response.json()
-        throw new Error(error.error)
+        throw new Error(error.error || "Failed to upload document")
       }
     } catch (error) {
       toast({
@@ -110,7 +123,7 @@ export function DocumentUpload({ employeeId, documents, onDocumentChange }: Docu
       if (response.ok) {
         toast({
           title: "Success",
-          description: "Document deleted successfully",
+          description: "Document deleted successfully from cloud storage",
         })
         onDocumentChange()
       } else {
@@ -137,14 +150,18 @@ export function DocumentUpload({ employeeId, documents, onDocumentChange }: Docu
     return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
+  const isBlobUrl = (url: string) => {
+    return url.startsWith('https://')
+  }
+
   return (
     <div className="space-y-6">
       {/* Upload Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Upload Document
+            <Cloud className="h-5 w-5" />
+            Upload Document to Cloud Storage
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -165,12 +182,12 @@ export function DocumentUpload({ employeeId, documents, onDocumentChange }: Docu
               </Select>
             </div>
             <div>
-              <Label htmlFor="file-input">PDF File</Label>
+              <Label htmlFor="file-input">PDF File (Max 10MB)</Label>
               <Input id="file-input" type="file" accept=".pdf" onChange={handleFileSelect} />
             </div>
           </div>
           <Button onClick={handleUpload} disabled={!selectedFile || !selectedType || uploading} className="w-full">
-            {uploading ? "Uploading..." : "Upload Document"}
+            {uploading ? "Uploading to Cloud..." : "Upload Document"}
           </Button>
         </CardContent>
       </Card>
@@ -190,13 +207,21 @@ export function DocumentUpload({ employeeId, documents, onDocumentChange }: Docu
               return (
                 <div key={type.value} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      {document && isBlobUrl(document.file_path) && (
+                        <Cloud className="h-3 w-3 text-blue-500" />
+                      )}
+                    </div>
                     <div>
                       <p className="font-medium">{type.label}</p>
                       {document ? (
                         <p className="text-sm text-muted-foreground">
                           {document.file_name} • {formatFileSize(document.file_size)} •
                           {new Date(document.uploaded_at).toLocaleDateString()}
+                          {isBlobUrl(document.file_path) && (
+                            <span className="ml-2 text-blue-600 text-xs">☁️ Cloud</span>
+                          )}
                         </p>
                       ) : (
                         <p className="text-sm text-muted-foreground">No document uploaded</p>
@@ -206,10 +231,20 @@ export function DocumentUpload({ employeeId, documents, onDocumentChange }: Docu
                   <div className="flex items-center gap-2">
                     {document ? (
                       <>
-                        <Button variant="outline" size="sm" onClick={() => window.open(document.file_path, "_blank")}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => window.open(document.file_path, "_blank")}
+                          title="Download document"
+                        >
                           <Download className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDelete(document.document_type)}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleDelete(document.document_type)}
+                          title="Delete document"
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </>

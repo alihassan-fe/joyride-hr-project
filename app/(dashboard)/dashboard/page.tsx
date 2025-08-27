@@ -13,15 +13,31 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { ExternalLink, RefreshCw, FileText, Info, ArrowRight } from "lucide-react"
+import { ExternalLink, RefreshCw, FileText, Info, ArrowRight, Building2 } from "lucide-react"
 import { Candidate, OutboxItem } from "@/lib/types"
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false })
 
+interface DepartmentMetrics {
+  name: string
+  candidates: {
+    total: number
+    callImmediately: number
+    remove: number
+    shortlist: number
+    recent: any[]
+  }
+  employees: {
+    total: number
+    avgPerformance: number
+  }
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<Candidate[]>([])
-  console.log("data", data);
+  const [departmentMetrics, setDepartmentMetrics] = useState<DepartmentMetrics[]>([])
   const [loading, setLoading] = useState(false)
+  const [departmentLoading, setDepartmentLoading] = useState(false)
   const [error, setError] = useState<string>("")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogTitle, setDialogTitle] = useState("")
@@ -32,14 +48,29 @@ export default function DashboardPage() {
   const [outboxLoading, setOutboxLoading] = useState(false)
 
   async function fetchData() {
-  try {
+    try {
       setLoading(true)
       const res = await fetch("/api/candidates")
       const data = await res.json()
-      console.log("data[", data)
       setData(data ?? [])
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchDepartmentMetrics() {
+    try {
+      setDepartmentLoading(true)
+      const res = await fetch("/api/dashboard/department-metrics")
+      if (!res.ok) throw new Error("Failed to load department metrics")
+      const json = await res.json()
+      console.log("json", json)
+      setDepartmentMetrics(json.data || [])
+    } catch (error) {
+      console.error("Error fetching department metrics:", error)
+      setError("Failed to load department metrics")
+    } finally {
+      setDepartmentLoading(false)
     }
   }
 
@@ -62,7 +93,7 @@ export default function DashboardPage() {
     }
   }
 
-    async function fetchOutbox() {
+  async function fetchOutbox() {
     setOutboxLoading(true)
     try {
       const res = await fetch("/api/calendar/outbox", { cache: "no-store" })
@@ -79,6 +110,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchData()
+    fetchDepartmentMetrics()
     fetchEvents()
     fetchOutbox()
   }, [])
@@ -90,107 +122,70 @@ export default function DashboardPage() {
   }
 
   const truncate = (str: string, max: number) =>
-  str.length > max ? str.slice(0, max) + "..." : str
+    str.length > max ? str.slice(0, max) + "..." : str
 
-  // Score comparison for existing ECharts line
-const lineChartOption = useMemo(() => {
-  // take only the last 10 entries
-  const latest = data.slice(-12)
+  // Overall stats across all departments
+  const overallStats = useMemo(() => {
+    const totalCandidates = departmentMetrics.reduce((sum, dept) => sum + dept.candidates.total, 0)
+    const totalCallImmediately = departmentMetrics.reduce((sum, dept) => sum + dept.candidates.callImmediately, 0)
+    const totalRemove = departmentMetrics.reduce((sum, dept) => sum + dept.candidates.remove, 0)
+    const totalShortlist = departmentMetrics.reduce((sum, dept) => sum + dept.candidates.shortlist, 0)
+    const totalEmployees = departmentMetrics.reduce((sum, dept) => sum + dept.employees.total, 0)
 
-  const names = latest.map((c) => truncate(c.name, 8))
-  const dispatchScores = latest.map((c) => Number(c.dispatch ?? 0))
-  const opsScores = latest.map((c) => Number(c.operations_manager ?? 0))
-
-  return {
-    tooltip: { trigger: "axis" },
-    legend: { data: ["Dispatch", "Ops Manager"] },
-    grid: { left: 40, right: 20, bottom: 40, top: 40, containLabel: true },
-    xAxis: {
-      type: "category",
-      data: names,
-      axisLabel: { interval: 0, rotate: 0 },
-    },
-    yAxis: { type: "value", min: 0 },
-    series: [
-      {
-        name: "Dispatch",
-        type: "line",
-        data: dispatchScores,
-        itemStyle: { color: "#f59e0b" },
-        lineStyle: { color: "#f59e0b" },
-        symbol: "circle",
-        symbolSize: 6,
-      },
-      {
-        name: "Ops Manager",
-        type: "line",
-        data: opsScores,
-        itemStyle: { color: "#10b981" },
-        lineStyle: { color: "#10b981" },
-        symbol: "circle",
-        symbolSize: 6,
-      },
-    ],
-  }
-}, [data])
-
-  // Stats
-  const stats = useMemo(() => {
-    const candidates = data
     return {
-      total: candidates.length,
-      consider: candidates.filter((c) => c.recommendation?.toLowerCase() === "call immediately").length,
-      remove: candidates.filter((c) => c.recommendation?.toLowerCase() === "remove").length,
-      shortlist: candidates.filter((c) => c.recommendation?.toLowerCase() === "shortlist").length,
-      avgDispatch:
-        candidates.length > 0
-          ? (candidates.reduce((sum, c) => sum + (c.dispatch || 0), 0) / candidates.length).toFixed(1)
-          : "0",
-      avgOpsManager:
-        candidates.length > 0
-          ? (candidates.reduce((sum, c) => sum + (c.operations_manager || 0), 0) / candidates.length).toFixed(1)
-          : "0",
+      totalCandidates,
+      totalCallImmediately,
+      totalRemove,
+      totalShortlist,
+      totalEmployees
     }
-  }, [data])
+  }, [departmentMetrics])
 
-  // New charts data
-const groupedBarData = useMemo(() => {
-  return [...data]
-    .sort(
-      (a, b) =>
-        (Number(b.dispatch ?? 0) + Number(b.operations_manager ?? 0)) -
-        (Number(a.dispatch ?? 0) + Number(a.operations_manager ?? 0))
-    )
-    .slice(0, 5) // top 5 results
-    .map((c) => ({
-      name: truncate(c.name, 12),
-      dispatch: Number(c.dispatch ?? 0),
-      ops: Number(c.operations_manager ?? 0),
-    }));
-}, [data]);
+  // Department comparison chart data
+  const departmentComparisonData = useMemo(() => {
+    return departmentMetrics.map(dept => ({
+      name: dept.name,
+      candidates: dept.candidates.total,
+      employees: dept.employees.total,
+      callImmediately: dept.candidates.callImmediately,
+      remove: dept.candidates.remove,
+      shortlist: dept.candidates.shortlist
+    }))
+  }, [departmentMetrics])
 
+  // Recommendation distribution across departments
   const recommendationPieData = useMemo(() => {
-    const consider = stats.consider
-    const remove = stats.remove
+    const callImmediately = overallStats.totalCallImmediately
+    const remove = overallStats.totalRemove
+    const shortlist = overallStats.totalShortlist
     return [
-      { key: "consider", label: "Consider", value: consider },
-      { key: "remove", label: "Remove", value: remove },
+      { key: "callImmediately", label: "Call Immediately", value: callImmediately, color: "#10b981" },
+      { key: "remove", label: "Remove", value: remove, color: "#ef4444" },
+      { key: "shortlist", label: "Shortlist", value: shortlist, color: "#3b82f6" },
     ]
-  }, [stats.consider, stats.remove])
+  }, [overallStats])
+
+  // Department candidate distribution
+  const departmentCandidateData = useMemo(() => {
+    return departmentMetrics.map(dept => ({
+      name: dept.name,
+      candidates: dept.candidates.total,
+      employees: dept.employees.total,
+    }))
+  }, [departmentMetrics])
 
   return (
     <div className="space-y-6">
-
       {/* Header row */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-neutral-500">Visualize candidate evaluation data</p>
+          <p className="text-sm text-neutral-500">Multi-department candidate evaluation overview</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={fetchData} disabled={loading}>
+          <Button variant="outline" onClick={() => { fetchData(); fetchDepartmentMetrics(); }} disabled={loading || departmentLoading}>
             <RefreshCw className="h-4 w-4 mr-2" />
-            {loading ? "Refreshing..." : "Refresh"}
+            {loading || departmentLoading ? "Refreshing..." : "Refresh"}
           </Button>
         </div>
       </div>
@@ -203,23 +198,35 @@ const groupedBarData = useMemo(() => {
         </Alert>
       )}
 
-      {/* Stats Cards */}
+      {/* Overall Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="rounded-2xl shadow-md">
           <CardHeader>
             <CardTitle className="text-sm font-medium text-neutral-600">Total Candidates</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold">{loading ? "..." : stats.total}</div>
+            <div className="text-3xl font-bold">{departmentLoading ? "..." : overallStats.totalCandidates}</div>
+            <p className="text-xs text-neutral-500 mt-1">Across all departments</p>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl shadow-md">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-neutral-600">Consider</CardTitle>
+            <CardTitle className="text-sm font-medium text-neutral-600">Total Employees</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold text-emerald-600">{loading ? "..." : stats.consider}</div>
+            <div className="text-3xl font-bold text-blue-600">{departmentLoading ? "..." : overallStats.totalEmployees}</div>
+            <p className="text-xs text-neutral-500 mt-1">Active employees</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl shadow-md">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-neutral-600">Call Immediately</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-emerald-600">{departmentLoading ? "..." : overallStats.totalCallImmediately}</div>
+            <p className="text-xs text-neutral-500 mt-1">Priority candidates</p>
           </CardContent>
         </Card>
 
@@ -228,81 +235,108 @@ const groupedBarData = useMemo(() => {
             <CardTitle className="text-sm font-medium text-neutral-600">Remove</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold text-red-600">{loading ? "..." : stats.remove}</div>
+            <div className="text-3xl font-bold text-red-600">{departmentLoading ? "..." : overallStats.totalRemove}</div>
+            <p className="text-xs text-neutral-500 mt-1">Not suitable</p>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl shadow-md">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-neutral-600">Avg Dispatch</CardTitle>
+            <CardTitle className="text-sm font-medium text-neutral-600">Shortlist</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold text-amber-600">{loading ? "..." : stats.avgDispatch}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl shadow-md">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-neutral-600">Avg Ops Manager</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-emerald-600">{loading ? "..." : stats.avgOpsManager}</div>
+            <div className="text-3xl font-bold text-blue-600">{departmentLoading ? "..." : overallStats.totalShortlist}</div>
+            <p className="text-xs text-neutral-500 mt-1">Under review</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* New charts row (2 charts) */}
+      {/* Department Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {departmentMetrics.map((dept) => (
+          <Card key={dept.name} className="rounded-2xl shadow-md">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-neutral-500" />
+                <CardTitle className="text-sm font-medium">{dept.name}</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <p className="text-neutral-500">Candidates</p>
+                  <p className="font-semibold">{dept.candidates.total}</p>
+                </div>
+                <div>
+                  <p className="text-neutral-500">Employees</p>
+                  <p className="font-semibold">{dept.employees.total}</p>
+                </div>
+              </div>
+              <div className="flex gap-1">
+                <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-800">
+                  {dept.candidates.callImmediately} Call Immediately
+                </Badge>
+                <Badge variant="secondary" className="text-xs bg-red-100 text-red-800">
+                  {dept.candidates.remove} Remove
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Grouped Bar Chart: Dispatch vs Ops Manager */}
+        {/* Department Candidate Distribution */}
         <Card className="rounded-2xl shadow-md">
           <CardHeader>
-            <CardTitle className="text-base">Scores by Candidate</CardTitle>
+            <CardTitle className="text-base">Department Candidate Distribution</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {departmentLoading ? (
               <div className="h-[320px] rounded-xl bg-neutral-100 animate-pulse" />
             ) : (
               <ChartContainer
                 config={{
-                  dispatch: { label: "Dispatch", color: "var(--chart-3)" },
-                  ops: { label: "Ops Manager", color: "var(--chart-5)" },
+                  candidates: { label: "Candidates", color: "var(--chart-3)" },
+                  employees: { label: "Employees", color: "var(--chart-5)" },
                 }}
                 className="h-[320px]"
               >
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={groupedBarData} margin={{ left: 12, right: 12, top: 8, bottom: 8 }}>
+                  <BarChart data={departmentCandidateData} margin={{ left: 12, right: 12, top: 8, bottom: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="name"
                       tick={{ fontSize: 12 }}
                       interval={0}
-                      angle={groupedBarData.length > 6 ? -20 : 0}
-                      textAnchor={groupedBarData.length > 6 ? "end" : "middle"}
                     />
                     <YAxis allowDecimals={false} />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Legend />
-<Bar dataKey="dispatch" name="Dispatch" fill="var(--chart-3)" radius={6} />
-<Bar dataKey="ops" name="Ops Manager" fill="var(--chart-5)" radius={6} />                </BarChart>
+                    <Bar dataKey="candidates" name="Candidates" fill="var(--chart-3)" radius={6} />
+                    <Bar dataKey="employees" name="Employees" fill="var(--chart-5)" radius={6} />
+                  </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
             )}
           </CardContent>
         </Card>
 
-        {/* Recommendation Distribution Donut */}
+        {/* Recommendation Distribution */}
         <Card className="rounded-2xl shadow-md">
           <CardHeader>
-            <CardTitle className="text-base">Recommendation Distribution</CardTitle>
+            <CardTitle className="text-base">Overall Recommendation Distribution</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {departmentLoading ? (
               <div className="h-[320px] rounded-xl bg-neutral-100 animate-pulse" />
             ) : (
               <ChartContainer
                 config={{
-                  consider: { label: "Consider", color: "var(--chart-3)" },
-                  remove: { label: "Remove", color: "ar(--chart-5)" },
+                  callImmediately: { label: "Call Immediately", color: "var(--chart-3)" },
+                  remove: { label: "Remove", color: "var(--chart-5)" },
+                  shortlist: { label: "Shortlist", color: "var(--chart-1)" },
                 }}
                 className="h-[320px]"
               >
@@ -310,11 +344,11 @@ const groupedBarData = useMemo(() => {
                   <PieChart>
                     <ChartTooltip content={<ChartTooltipContent nameKey="label" />} />
                     <Legend />
-                   <Pie data={recommendationPieData} dataKey="value" nameKey="label" innerRadius={70} outerRadius={110} strokeWidth={2}>
-  {recommendationPieData.map((entry) => (
-    <Cell key={entry.key} fill={entry.key === "consider" ? "var(--chart-3)" : "var(--chart-5)"} />
-  ))}
-</Pie>
+                    <Pie data={recommendationPieData} dataKey="value" nameKey="label" innerRadius={70} outerRadius={110} strokeWidth={2}>
+                      {recommendationPieData.map((entry) => (
+                        <Cell key={entry.key} fill={entry.color} />
+                      ))}
+                    </Pie>
                   </PieChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -323,23 +357,7 @@ const groupedBarData = useMemo(() => {
         </Card>
       </div>
 
-      {/* Existing Score Comparison Line Chart (ECharts) */}
-      <Card className="rounded-2xl shadow-md">
-        <CardHeader>
-          <CardTitle className="text-base">Score Comparison</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="h-[360px] rounded-xl bg-neutral-100 animate-pulse" />
-          ) : (
-            <div className="w-full">
-              <ReactECharts option={lineChartOption} style={{ height: 360 }} notMerge={true} lazyUpdate={true} />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-     {/* Two-column info: Recent Events + Quick Insights */}
+      {/* Two-column info: Recent Events + Quick Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Events */}
         <Card className="rounded-2xl shadow-md">
@@ -423,30 +441,25 @@ const groupedBarData = useMemo(() => {
 
         <Card className="rounded-2xl shadow-md">
           <CardHeader>
-            <CardTitle className="text-base">Quick Insights</CardTitle>
+            <CardTitle className="text-base">Multi-Department Insights</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-neutral-700">
             <ul className="space-y-2 list-disc pl-5">
               <li>
-                {"You have "}
-                <Badge variant="secondary" className="bg-purple-100 text-purple-800">{stats.consider}</Badge>
-                {" candidates marked as "}
-                <strong>Consider</strong>  
-                {" and "}
-                <Badge variant="secondary" className="bg-purple-100 text-purple-800">{stats.remove}</Badge>
-                {" marked as "}
-                <strong>Remove</strong>
-                {" and "}
-                <Badge variant="secondary" className="bg-purple-100 text-purple-800">{stats.shortlist}</Badge>
-                {" marked as "}
-                <strong>Shortlist</strong>
-                {"."}
+                {"Across "}
+                <Badge variant="secondary" className="bg-purple-100 text-purple-800">{departmentMetrics.length}</Badge>
+                {" departments, you have "}
+                <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">{overallStats.totalCallImmediately}</Badge>
+                {" candidates to call immediately, "}
+                <Badge variant="secondary" className="bg-red-100 text-red-800">{overallStats.totalRemove}</Badge>
+                {" to remove, and "}
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800">{overallStats.totalShortlist}</Badge>
+                {" shortlisted."}
               </li>
               <li>
-                {"Average scores — Dispatch: "}
-                <Badge variant="secondary" className="bg-purple-100 text-purple-800">{stats.avgDispatch}</Badge>
-                {", Ops Manager: "}
-                <Badge variant="secondary" className="bg-purple-100 text-purple-800">{stats.avgOpsManager}</Badge>.
+                {"Total active employees: "}
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800">{overallStats.totalEmployees}</Badge>
+                {" across all departments."}
               </li>
               <li>
                 {"Upcoming events: "}
@@ -464,88 +477,81 @@ const groupedBarData = useMemo(() => {
                   {" queued."}
                 </li>
               )}
-              <li>Use Calendar to plan interviews — drag on the calendar to create events quickly.</li>
+              <li>Each department has specific evaluation criteria and scoring metrics.</li>
             </ul>
             <div className="pt-2 flex gap-2">
               <Button asChild size="sm">
                 <Link href="/calendar">Open Calendar</Link>
               </Button>
-              {outbox.length > 0 && (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/calendar">View Outbox</Link>
-                </Button>
-              )}
+              <Button asChild size="sm" variant="outline">
+                <Link href="/applicants">View All Candidates</Link>
+              </Button>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Candidates Table */}
       <Card className="rounded-2xl shadow-md">
         <CardHeader>
-          <CardTitle className="text-base">Candidates</CardTitle>
+          <CardTitle className="text-base">Recent Candidates by Department</CardTitle>
         </CardHeader>
         <CardContent>
-         <div className="border rounded-md overflow-x-auto w-full max-w-[1190px]">
-              <Table className="w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[150px] whitespace-nowrap">Name</TableHead>
-                    <TableHead className="min-w-[200px] whitespace-nowrap">Email</TableHead>
-                    <TableHead className="min-w-[120px] whitespace-nowrap">Phone</TableHead>
-                             <TableHead className="min-w-[120px] whitespace-nowrap">Department</TableHead>
-                    <TableHead className="min-w-[120px] whitespace-nowrap">
-                     Recommendation
-                    </TableHead>
-                    <TableHead className="min-w-[80px] whitespace-nowrap">CV</TableHead>
-                    <TableHead className="min-w-[100px] whitespace-nowrap">Strengths</TableHead>
-                    <TableHead className="min-w-[100px] whitespace-nowrap">Weaknesses</TableHead>
-                    <TableHead className="min-w-[200px]">
-                     Notes
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading &&
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="min-w-[150px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[140px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[200px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[180px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[120px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[80px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[60px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[80px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[60px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[200px]">
-                          <div className="h-4 w-full max-w-[180px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                        <TableCell className="min-w-[120px] whitespace-nowrap">
-                          <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  {!loading &&
-                    data.slice(0, 8).map((c) => (
-                      <TableRow key={c.id} className="hover:bg-neutral-50">
-                        <TableCell className="font-medium min-w-[150px] whitespace-nowrap">{c.name}</TableCell>
-                        <TableCell className="text-neutral-600 min-w-[200px] whitespace-nowrap">{c.email}</TableCell>
-                        <TableCell className="text-neutral-600 min-w-[120px] whitespace-nowrap">{c.phone}</TableCell>
-                              <TableCell className="min-w-[120px] whitespace-nowrap">
+          <div className="border rounded-md overflow-x-auto w-full max-w-[1190px]">
+            <Table className="w-full">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[150px] whitespace-nowrap">Name</TableHead>
+                  <TableHead className="min-w-[200px] whitespace-nowrap">Email</TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">Phone</TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">Department</TableHead>
+                  <TableHead className="min-w-[120px] whitespace-nowrap">Status</TableHead>
+                  <TableHead className="min-w-[80px] whitespace-nowrap">CV</TableHead>
+                  <TableHead className="min-w-[100px] whitespace-nowrap">Strengths</TableHead>
+                  <TableHead className="min-w-[100px] whitespace-nowrap">Weaknesses</TableHead>
+                  <TableHead className="min-w-[200px]">Notes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading &&
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="min-w-[150px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[140px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[200px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[180px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[100px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[60px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[60px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <div className="h-4 w-full max-w-[80px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                      <TableCell className="min-w-[200px]">
+                        <div className="h-4 w-full max-w-[180px] rounded bg-neutral-100 animate-pulse" />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                {!loading &&
+                  data.slice(0, 8).map((c) => (
+                    <TableRow key={c.id} className="hover:bg-neutral-50">
+                      <TableCell className="font-medium min-w-[150px] whitespace-nowrap">{c.name}</TableCell>
+                      <TableCell className="text-neutral-600 min-w-[200px] whitespace-nowrap">{c.email}</TableCell>
+                      <TableCell className="text-neutral-600 min-w-[120px] whitespace-nowrap">{c.phone}</TableCell>
+                      <TableCell className="min-w-[120px] whitespace-nowrap">
                         {c.department ? (
                           <Badge variant="outline" className="text-xs">
                             {c.department}
@@ -555,74 +561,83 @@ const groupedBarData = useMemo(() => {
                         )}
                       </TableCell>
                       <TableCell className="min-w-[120px] whitespace-nowrap">
-                          <RecommendationBadge value={c.recommendation || ""} />
-                        </TableCell>
-                        <TableCell className="min-w-[80px] whitespace-nowrap">
-                          {c.cv_link ? (
-                            <a
-                              href={c.cv_link}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center text-sm text-neutral-700 hover:underline"
-                            >
-                              <FileText className="h-4 w-4 mr-1.5" />
-                              Open
-                              <ExternalLink className="h-3.5 w-3.5 ml-1" />
-                            </a>
-                          ) : (
-                            <span className="text-neutral-400">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openListDialog(`Strengths — ${c.name}`, c.strengths || [])}
-                            disabled={!c.strengths || c.strengths.length === 0}
+                        {c.status ? (
+                          <Badge 
+                            style={{ backgroundColor: c.status.color, color: 'white' }}
+                            className="text-xs"
                           >
-                            View
-                          </Button>
-                        </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openListDialog(`Weaknesses — ${c.name}`, c.weaknesses || [])}
-                            disabled={!c.weaknesses || c.weaknesses.length === 0}
+                            {c.status.name}
+                          </Badge>
+                        ) : (
+                          <RecommendationBadge value={c.recommendation ?? ""} />
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-[80px] whitespace-nowrap">
+                        {c.cv_link ? (
+                          <a
+                            href={c.cv_link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center text-sm text-neutral-700 hover:underline"
                           >
-                            View
-                          </Button>
-                        </TableCell>
-                        <TableCell className="min-w-[200px]">
-                          {c.notes ? (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-flex items-center gap-1 max-w-[180px] truncate cursor-help">
-                                    <Info className="h-3.5 w-3.5 text-neutral-500" />
-                                    <span className="text-neutral-700">{c.notes}</span>
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-xs">
-                                  <p className="text-xs">{c.notes}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          ) : (
-                            <span className="text-neutral-400">—</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  {!loading && data.length === 0 && !error && (
-                    <TableRow>
-                      <TableCell colSpan={10} className="text-sm text-neutral-500">
-                        No candidates found from the webhook.
+                            <FileText className="h-4 w-4 mr-1.5" />
+                            Open
+                            <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                          </a>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openListDialog(`Strengths — ${c.name}`, c.strengths || [])}
+                          disabled={!c.strengths || c.strengths.length === 0}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                      <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openListDialog(`Weaknesses — ${c.name}`, c.weaknesses || [])}
+                          disabled={!c.weaknesses || c.weaknesses.length === 0}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                      <TableCell className="min-w-[200px]">
+                        {c.notes ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center gap-1 max-w-[180px] truncate cursor-help">
+                                  <Info className="h-3.5 w-3.5 text-neutral-500" />
+                                  <span className="text-neutral-700">{c.notes}</span>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="text-xs">{c.notes}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
                       </TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  ))}
+                {!loading && data.length === 0 && !error && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-sm text-neutral-500">
+                      No candidates found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
@@ -660,10 +675,10 @@ function RecommendationBadge({ value }: { value?: string }) {
     return <Badge variant="destructive">Remove</Badge>
   }
 
-  if (v === "call immediately") {
+  if (v === "call immediately" || v === "call immediatley") {
     return (
       <Badge className="bg-emerald-100 text-emerald-900" variant="secondary">
-        Consider
+        Call Immediately
       </Badge>
     )
   }

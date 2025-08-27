@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSql } from "@/lib/sql"
+import { auth } from "@/lib/auth-next"
 
 export async function GET() {
   const sql = getSql()
@@ -17,6 +18,11 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user || (session.user as any)?.role !== "Admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
   const sql = getSql()
   try {
     const body = await req.json().catch(() => null)

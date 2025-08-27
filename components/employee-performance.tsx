@@ -80,7 +80,6 @@ export function EmployeePerformance({ employeeId, currentScore }: EmployeePerfor
           score,
           performance_date: formData.performance_date,
           notes: formData.notes.trim() || null,
-          created_by: employeeId // TODO: Get from session
         }),
       })
 

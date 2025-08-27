@@ -39,7 +39,7 @@ UPDATE candidates
 SET status_id = (
   SELECT id FROM candidate_statuses 
   WHERE name = CASE 
-    WHEN candidates.recommendation = 'Call Immediatley' THEN 'Call Immediately'
+    WHEN candidates.recommendation = 'Call Immediately' THEN 'Call Immediately'
     WHEN candidates.recommendation = 'Shortlist' THEN 'Shortlist'
     WHEN candidates.recommendation = 'Remove' THEN 'Remove'
     ELSE 'Shortlist' -- Default fallback

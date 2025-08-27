@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSql } from "@/lib/sql"
+import { auth } from "@/lib/auth-next"
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const sql = getSql()
@@ -47,10 +48,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const sql = getSql()
   try {
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const employeeId = params.id
     const body = await req.json()
 
-    const { score, performance_date, notes, created_by } = body
+    const { score, performance_date, notes } = body
 
     if (!score || !performance_date) {
       return NextResponse.json({ error: "Score and performance date are required" }, { status: 400 })
@@ -61,9 +67,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Score must be between 0 and 10" }, { status: 400 })
     }
 
+    // Get the current user's ID to use as created_by
+    const currentUserId = (session.user as any).id
+
     const [performanceRecord] = await sql/* sql */`
       INSERT INTO employee_performance (employee_id, score, performance_date, notes, created_by)
-      VALUES (${employeeId}, ${score}, ${performance_date}, ${notes || null}, ${created_by || null})
+      VALUES (${employeeId}, ${score}, ${performance_date}, ${notes || null}, ${currentUserId})
       RETURNING 
         id, employee_id, score, performance_date, notes, created_by, created_at, updated_at
     `

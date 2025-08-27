@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { FileText, User, Trash2, Edit, ExternalLink } from "lucide-react"
+import { FileText, User, Trash2, Edit, ExternalLink, Mail, Phone } from "lucide-react"
 import { Candidate, CandidateStatusOption } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -71,7 +71,7 @@ export function CandidateKanban({
   }
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
+    <div className="flex gap-4 overflow-x-auto w-full max-w-[1190px] pb-4">
       {columns.map((column) => (
         <div
           key={column.status.id}
@@ -122,6 +122,7 @@ export function CandidateKanban({
                             size="sm"
                             onClick={() => onView(candidate)}
                             className="h-6 w-6 p-0"
+                            title="View Details"
                           >
                             <User className="h-3 w-3" />
                           </Button>
@@ -130,14 +131,35 @@ export function CandidateKanban({
                             size="sm"
                             onClick={() => onEdit(candidate)}
                             className="h-6 w-6 p-0"
+                            title="Edit Candidate"
                           >
                             <Edit className="h-3 w-3" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => window.open(`mailto:${candidate.email}`, '_blank')}
+                            className="h-6 w-6 p-0"
+                            title="Send Email"
+                          >
+                            <Mail className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(`tel:${candidate.phone}`, '_blank')}
+                            className="h-6 w-6 p-0"
+                            title="Call Candidate"
+                            disabled={!candidate.phone}
+                          >
+                            <Phone className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => onDelete(candidate.id)}
                             className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                            title="Delete Candidate"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>

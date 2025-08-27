@@ -64,9 +64,9 @@ export default function DashboardLayout({
             <ModeToggle />
           </div>
         </header>
-        <main className="min-h-[calc(100vh-3.5rem)] p-4">
+        <div className="min-h-[calc(100vh-3.5rem)] p-4">
           {children}
-        </main>
+        </div>
       </SidebarInset>
       <AIChatFloating />
     </SidebarProvider>

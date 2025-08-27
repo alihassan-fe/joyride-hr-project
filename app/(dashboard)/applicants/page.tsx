@@ -7,12 +7,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
-import { ExternalLink, RefreshCw, FileText, Info, Upload, Grid3X3, List, Settings, Trash2, Edit } from "lucide-react"
+import { ExternalLink, RefreshCw, FileText, Info, Upload, Grid3X3, List, Trash2, Edit, Mail, Phone } from "lucide-react"
 import { ManualUpload } from "@/components/manual-upload"
 import { Input } from "@/components/ui/input" 
 import { CandidateDrawer } from "@/components/candidate-drawer"
 import { CandidateKanban } from "@/components/candidate-kanban"
-import { StatusManagement } from "@/components/status-management"
 import { CandidateEditDialog } from "@/components/candidate-edit-dialog"
 import {
   Select,
@@ -33,7 +32,6 @@ export default function ApplicantsPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>("")
   const [viewMode, setViewMode] = useState<ViewMode>("list")
-  const [showStatusManagement, setShowStatusManagement] = useState(false)
   const [selected, setSelected] = useState<Candidate | null>(null)
   const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -160,54 +158,7 @@ export default function ApplicantsPage() {
     }
   }
 
-  async function handleAddStatus(name: string, color: string) {
-    try {
-      const res = await fetch("/api/candidate-statuses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, color }),
-      })
-      if (!res.ok) {
-        throw new Error("Failed to add status")
-      }
-      await fetchStatuses()
-    } catch (error) {
-      console.error("Error adding status:", error)
-      throw error
-    }
-  }
 
-  async function handleUpdateStatus(id: number, name: string, color: string) {
-    try {
-      const res = await fetch(`/api/candidate-statuses/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, color }),
-      })
-      if (!res.ok) {
-        throw new Error("Failed to update status")
-      }
-      await fetchStatuses()
-    } catch (error) {
-      console.error("Error updating status:", error)
-      throw error
-    }
-  }
-
-  async function handleDeleteStatus(id: number) {
-    try {
-      const res = await fetch(`/api/candidate-statuses/${id}`, {
-        method: "DELETE",
-      })
-      if (!res.ok) {
-        throw new Error("Failed to delete status")
-      }
-      await fetchStatuses()
-    } catch (error) {
-      console.error("Error deleting status:", error)
-      throw error
-    }
-  }
 
   const openEditDialog = (candidate: Candidate) => {
     setEditingCandidate(candidate)
@@ -223,14 +174,6 @@ export default function ApplicantsPage() {
           <p className="text-sm text-neutral-500">Manage candidate applications</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowStatusManagement(!showStatusManagement)}
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Status Management
-          </Button>
           <ManualUpload onAdded={fetchCandidates} />
           <Button variant="outline" onClick={fetchCandidates} disabled={loading}>
             <RefreshCw className="h-4 w-4 mr-2" />
@@ -239,22 +182,7 @@ export default function ApplicantsPage() {
         </div>
       </div>
 
-      {/* Status Management */}
-      {showStatusManagement && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Status Management</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <StatusManagement
-              statuses={statuses}
-              onAddStatus={handleAddStatus}
-              onUpdateStatus={handleUpdateStatus}
-              onDeleteStatus={handleDeleteStatus}
-            />
-          </CardContent>
-        </Card>
-      )}
+
 
       {/* Error state */}
       {error && (
@@ -501,13 +429,14 @@ export default function ApplicantsPage() {
                             <span className="text-neutral-400">—</span>
                           )}
                         </TableCell>
-                        <TableCell className="min-w-[100px] whitespace-nowrap">
+                        <TableCell className="min-w-[120px] whitespace-nowrap">
                           <div className="flex items-center gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => setSelected(c)}
                               className="h-8 w-8 p-0"
+                              title="View Details"
                             >
                               <Info className="h-4 w-4" />
                             </Button>
@@ -516,14 +445,35 @@ export default function ApplicantsPage() {
                               size="sm"
                               onClick={() => openEditDialog(c)}
                               className="h-8 w-8 p-0"
+                              title="Edit Candidate"
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => window.open(`mailto:${c.email}`, '_blank')}
+                              className="h-8 w-8 p-0"
+                              title="Send Email"
+                            >
+                              <Mail className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(`tel:${c.phone}`, '_blank')}
+                              className="h-8 w-8 p-0"
+                              title="Call Candidate"
+                              disabled={!c.phone}
+                            >
+                              <Phone className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => handleDeleteCandidate(c.id)}
                               className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                              title="Delete Candidate"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

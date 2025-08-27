@@ -7,6 +7,7 @@ import { GeistMono } from "geist/font/mono"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SessionProvider } from "next-auth/react"
+import { Toaster } from "@/components/ui/toaster"
 
 // export const metadata: Metadata = {
 //   title: 'Joyride HR',
@@ -31,6 +32,7 @@ export default function RootLayout({
         <SessionProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             {children}
+            <Toaster />
           </ThemeProvider>
         </SessionProvider>
       </body>

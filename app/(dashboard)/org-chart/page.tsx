@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import dynamic from "next/dynamic"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -14,17 +13,23 @@ import {
   MapPin,
   Briefcase,
   Eye,
-  ZoomIn,
-  ZoomOut,
-  RotateCcw,
-  Navigation,
+  ChevronDown,
+  ChevronRight,
   FileImage,
   FileText,
 } from "lucide-react"
 import Link from "next/link"
-import { OrgNode, Team, Employee } from "@/lib/types"
+import { Team, Employee } from "@/lib/types"
 
-const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false })
+interface TreeNode {
+  id: string
+  name: string
+  type: 'department' | 'team' | 'employee' | 'location' | 'project'
+  data: any
+  children: TreeNode[]
+  isExpanded?: boolean
+  employee?: Employee
+}
 
 export default function OrgChartPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -33,10 +38,7 @@ export default function OrgChartPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedView, setSelectedView] = useState("department")
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null)
-  const [chartInstance, setChartInstance] = useState<any>(null)
-  const [breadcrumbs, setBreadcrumbs] = useState<string[]>([])
-  const [exportingPNG, setExportingPNG] = useState(false)
-  const [exportingPDF, setExportingPDF] = useState(false)
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const { toast } = useToast()
 
   const stats = {
@@ -74,83 +76,252 @@ export default function OrgChartPage() {
       setLoading(false)
     }
   }
-  console.log("employeesRes", employees)
-  console.log("teamsRes", teams)
-  
-  const handleSearch = useCallback(
-    (term: string) => {
-      setSearchTerm(term)
-      if (term && chartInstance) {
-        const foundEmployee = employees.find(
-          (emp) =>
-            emp.name.toLowerCase().includes(term.toLowerCase()) ||
-            emp.email.toLowerCase().includes(term.toLowerCase()) ||
-            (emp.job_title && emp.job_title.toLowerCase().includes(term.toLowerCase())),
-        )
 
-        if (foundEmployee) {
-          setSelectedEmployee(foundEmployee.id)
-          chartInstance.dispatchAction({
-            type: "highlight",
-            seriesIndex: 0,
-            dataIndex: foundEmployee.id,
-          })
-
-          const path = getEmployeePath(foundEmployee)
-          setBreadcrumbs(path)
-        }
-      } else {
-        setSelectedEmployee(null)
-        setBreadcrumbs([])
-        if (chartInstance) {
-          chartInstance.dispatchAction({
-            type: "downplay",
-            seriesIndex: 0,
-          })
-        }
+  const handleSearch = useCallback((term: string) => {
+    setSearchTerm(term)
+    if (term) {
+      const foundEmployee = employees.find(
+        (emp) =>
+          emp.name.toLowerCase().includes(term.toLowerCase()) ||
+          emp.email.toLowerCase().includes(term.toLowerCase()) ||
+          (emp.job_title && emp.job_title.toLowerCase().includes(term.toLowerCase())),
+      )
+      if (foundEmployee) {
+        setSelectedEmployee(foundEmployee.id)
+        // Expand all parent nodes to show the found employee
+        expandToEmployee(foundEmployee.id)
       }
-    },
-    [employees, chartInstance],
-  )
-
-  const getEmployeePath = (employee: Employee): string[] => {
-    const path = []
-    if (employee.department) path.push(employee.department)
-
-    const team = teams.find((t) => t.id === employee.team_id)
-    if (team) path.push(team.name)
-
-    if (employee.manager_id) {
-      const manager = employees.find((e) => e.id === employee.manager_id)
-      if (manager) path.push(`Reports to: ${manager.name}`)
-    }
-
-    path.push(employee.name)
-    return path
-  }
-
-  const handleZoomIn = () => {
-    if (chartInstance) {
-      chartInstance.dispatchAction({ type: "dataZoom", start: 10, end: 90 })
-    }
-  }
-
-  const handleZoomOut = () => {
-    if (chartInstance) {
-      chartInstance.dispatchAction({ type: "dataZoom", start: 0, end: 100 })
-    }
-  }
-
-  const handleResetView = () => {
-    if (chartInstance) {
-      chartInstance.dispatchAction({ type: "restore" })
+    } else {
       setSelectedEmployee(null)
-      setBreadcrumbs([])
-      setSearchTerm("")
     }
+  }, [employees])
+
+  const expandToEmployee = (employeeId: string) => {
+    const employee = employees.find(e => e.id === employeeId)
+    if (!employee) return
+
+    const newExpanded = new Set(expandedNodes)
+    
+    // Expand department
+    if (employee.department) {
+      newExpanded.add(`dept-${employee.department}`)
+    }
+    
+    // Expand team
+    if (employee.team_id) {
+      newExpanded.add(`team-${employee.team_id}`)
+    }
+    
+    // Expand location
+    if (employee.office_location) {
+      newExpanded.add(`loc-${employee.office_location}`)
+    }
+    
+    setExpandedNodes(newExpanded)
   }
 
-  const buildOrgTree = () => {
+  const toggleNode = (nodeId: string) => {
+    const newExpanded = new Set(expandedNodes)
+    if (newExpanded.has(nodeId)) {
+      newExpanded.delete(nodeId)
+    } else {
+      newExpanded.add(nodeId)
+    }
+    setExpandedNodes(newExpanded)
+  }
+
+  const buildDepartmentTree = (): TreeNode[] => {
+    const departments = [...new Set(employees.map((e) => e.department).filter(Boolean))]
+    
+    return departments.map((dept) => {
+      const deptEmployees = employees.filter((e) => e.department === dept)
+      const deptTeams = teams.filter((t) => t.department === dept)
+      
+      const teamNodes: TreeNode[] = deptTeams.map((team) => {
+        const teamMembers = deptEmployees.filter((e) => e.team_id === team.id)
+        const teamLead = teamMembers.find((e) => e.id === team.team_lead_id)
+        
+        const memberNodes: TreeNode[] = teamMembers
+          .filter((e) => e.id !== team.team_lead_id)
+          .map((emp) => ({
+            id: `emp-${emp.id}`,
+            name: emp.name,
+            type: 'employee' as const,
+            data: { jobTitle: emp.job_title, email: emp.email },
+            children: [],
+            employee: emp,
+          }))
+        
+        const children: TreeNode[] = []
+        if (teamLead) {
+          children.push({
+            id: `emp-${teamLead.id}`,
+            name: `${teamLead.name} (Lead)`,
+            type: 'employee' as const,
+            data: { jobTitle: teamLead.job_title, email: teamLead.email, isLead: true },
+            children: memberNodes,
+            employee: teamLead,
+          })
+        } else {
+          children.push(...memberNodes)
+        }
+        
+        return {
+          id: `team-${team.id}`,
+          name: team.name,
+          type: 'team' as const,
+          data: { memberCount: teamMembers.length },
+          children,
+        }
+      })
+      
+      const unassignedEmployees = deptEmployees.filter((e) => !e.team_id)
+      const unassignedNodes: TreeNode[] = unassignedEmployees.map((emp) => ({
+        id: `emp-${emp.id}`,
+        name: emp.name,
+        type: 'employee' as const,
+        data: { jobTitle: emp.job_title, email: emp.email },
+        children: [],
+        employee: emp,
+      }))
+      
+      return {
+        id: `dept-${dept}`,
+        name: dept,
+        type: 'department' as const,
+        data: { employeeCount: deptEmployees.length },
+        children: [...teamNodes, ...unassignedNodes],
+      }
+    })
+  }
+
+  const buildLocationTree = (): TreeNode[] => {
+    const locations = [...new Set(employees.map((e) => e.office_location).filter(Boolean))]
+    
+    return locations.map((location) => {
+      const locationEmployees = employees.filter((e) => e.office_location === location)
+      const locationTeams = teams.filter(
+        (t) => t.location === location || locationEmployees.some((emp) => emp.team_id === t.id),
+      )
+      
+      const teamNodes: TreeNode[] = locationTeams.map((team) => {
+        const teamMembers = locationEmployees.filter((e) => e.team_id === team.id)
+        const teamLead = teamMembers.find((e) => e.id === team.team_lead_id)
+        
+        const memberNodes: TreeNode[] = teamMembers
+          .filter((e) => e.id !== team.team_lead_id)
+          .map((emp) => ({
+            id: `emp-${emp.id}`,
+            name: emp.name,
+            type: 'employee' as const,
+            data: { jobTitle: emp.job_title, email: emp.email },
+            children: [],
+            employee: emp,
+          }))
+        
+        const children: TreeNode[] = []
+        if (teamLead) {
+          children.push({
+            id: `emp-${teamLead.id}`,
+            name: `${teamLead.name} (Lead)`,
+            type: 'employee' as const,
+            data: { jobTitle: teamLead.job_title, email: teamLead.email, isLead: true },
+            children: memberNodes,
+            employee: teamLead,
+          })
+        } else {
+          children.push(...memberNodes)
+        }
+        
+        return {
+          id: `team-${team.id}`,
+          name: team.name,
+          type: 'team' as const,
+          data: { memberCount: teamMembers.length },
+          children,
+        }
+      })
+      
+      const unassignedEmployees = locationEmployees.filter((e) => !e.team_id)
+      const unassignedNodes: TreeNode[] = unassignedEmployees.map((emp) => ({
+        id: `emp-${emp.id}`,
+        name: emp.name,
+        type: 'employee' as const,
+        data: { jobTitle: emp.job_title, email: emp.email },
+        children: [],
+        employee: emp,
+      }))
+      
+      return {
+        id: `loc-${location}`,
+        name: location,
+        type: 'location' as const,
+        data: { employeeCount: locationEmployees.length },
+        children: [...teamNodes, ...unassignedNodes],
+      }
+    })
+  }
+
+  const buildProjectTree = (): TreeNode[] => {
+    const projects = [
+      { id: "operations", name: "Operations Projects", departments: ["Operations"] },
+      { id: "safety", name: "Safety Initiatives", departments: ["Safety"] },
+      { id: "maintenance", name: "Maintenance Programs", departments: ["Maintenance"] },
+      { id: "finance", name: "Finance & Billing", departments: ["Billing Payroll"] },
+      { id: "cross-functional", name: "Cross-Functional Teams", departments: ["Operations", "Safety", "Maintenance"] },
+    ]
+    
+    return projects.map((project) => {
+      let projectEmployees: Employee[] = []
+      
+      if (project.id === "cross-functional") {
+        const managers = employees.filter((e) => employees.some((emp) => emp.manager_id === e.id))
+        const teamLeads = employees.filter((e) => teams.some((t) => t.team_lead_id === e.id))
+        projectEmployees = [...new Set([...managers, ...teamLeads])]
+      } else {
+        projectEmployees = employees.filter((e) => project.departments.includes(e.department || ""))
+      }
+      
+      const roleGroups = new Map<string, Employee[]>()
+      
+      projectEmployees.forEach((emp) => {
+        const role = emp.job_title || "General"
+        if (!roleGroups.has(role)) {
+          roleGroups.set(role, [])
+        }
+        roleGroups.get(role)!.push(emp)
+      })
+      
+      const roleNodes: TreeNode[] = Array.from(roleGroups.entries()).map(([role, employees]) => {
+        const employeeNodes: TreeNode[] = employees.map((emp) => ({
+          id: `emp-${emp.id}`,
+          name: emp.name,
+          type: 'employee' as const,
+          data: { jobTitle: emp.job_title, email: emp.email, department: emp.department },
+          children: [],
+          employee: emp,
+        }))
+        
+        return {
+          id: `role-${project.id}-${role}`,
+          name: role,
+          type: 'team' as const,
+          data: { memberCount: employees.length },
+          children: employeeNodes,
+        }
+      })
+      
+      return {
+        id: `proj-${project.id}`,
+        name: project.name,
+        type: 'project' as const,
+        data: { memberCount: projectEmployees.length },
+        children: roleNodes,
+      }
+    })
+  }
+
+  const buildOrgTree = (): TreeNode[] => {
     if (selectedView === "department") {
       return buildDepartmentTree()
     } else if (selectedView === "location") {
@@ -160,293 +331,116 @@ export default function OrgChartPage() {
     }
   }
 
-  const buildDepartmentTree = (): OrgNode[] => {
-    const departments = [...new Set(employees.map((e) => e.department).filter(Boolean))]
-
-    return departments.map((dept) => {
-      const deptEmployees = employees.filter((e) => e.department === dept)
-      const deptTeams = teams.filter((t) => t.department === dept)
-
-      const teamNodes: OrgNode[] = deptTeams.map((team) => {
-        const teamMembers = deptEmployees.filter((e) => e.team_id === team.id)
-        const teamLead = teamMembers.find((e) => e.id === team.team_lead_id)
-
-        const memberNodes: OrgNode[] = teamMembers
-          .filter((e) => e.id !== team.team_lead_id)
-          .map((emp) => ({
-            id: emp.id,
-            name: emp.name,
-            value: emp.job_title || emp.name,
-            symbolSize: selectedEmployee === emp.id ? 40 : 30,
-            itemStyle: {
-              color: selectedEmployee === emp.id ? "#ef4444" : "#10b981",
-              borderColor: selectedEmployee === emp.id ? "#dc2626" : "#059669",
-              borderWidth: selectedEmployee === emp.id ? 3 : 1,
-            },
-            category: 2,
-          }))
-
-        return {
-          id: team.id,
-          name: team.name,
-          value: `${team.name} (${teamMembers.length})`,
-          symbolSize: 40,
-          itemStyle: { color: "#3b82f6" },
-          category: 1,
-          children: [
-            ...(teamLead
-              ? [
-                  {
-                    id: teamLead.id,
-                    name: teamLead.name,
-                    value: `${teamLead.name} (Lead)`,
-                    symbolSize: selectedEmployee === teamLead.id ? 45 : 35,
-                    itemStyle: {
-                      color: selectedEmployee === teamLead.id ? "#ef4444" : "#f59e0b",
-                      borderColor: selectedEmployee === teamLead.id ? "#dc2626" : "#d97706",
-                      borderWidth: selectedEmployee === teamLead.id ? 3 : 1,
-                    },
-                    category: 1,
-                    children: memberNodes,
-                  },
-                ]
-              : memberNodes),
-          ],
-        }
-      })
-
-      const unassignedEmployees = deptEmployees.filter((e) => !e.team_id)
-      const unassignedNodes: OrgNode[] = unassignedEmployees.map((emp) => ({
-        id: emp.id,
-        name: emp.name,
-        value: emp.job_title || emp.name,
-        symbolSize: selectedEmployee === emp.id ? 40 : 30,
-        itemStyle: {
-          color: selectedEmployee === emp.id ? "#ef4444" : "#6b7280",
-          borderColor: selectedEmployee === emp.id ? "#dc2626" : "#4b5563",
-          borderWidth: selectedEmployee === emp.id ? 3 : 1,
-        },
-        category: 2,
-      }))
-
-      return {
-        id: dept || "unknown",
-        name: dept || "Unassigned",
-        value: `${dept} (${deptEmployees.length})`,
-        symbolSize: 50,
-        itemStyle: { color: "#8b5cf6" },
-        category: 0,
-        children: [...teamNodes, ...unassignedNodes],
+  const renderTreeNode = (node: TreeNode, level: number = 0) => {
+    const isExpanded = expandedNodes.has(node.id)
+    const hasChildren = node.children.length > 0
+    const isSelected = node.employee && selectedEmployee === node.employee.id
+    
+    const getNodeIcon = () => {
+      switch (node.type) {
+        case 'department':
+          return <Briefcase className="h-4 w-4 text-purple-600" />
+        case 'team':
+          return <Users className="h-4 w-4 text-blue-600" />
+        case 'employee':
+          return <div className="h-4 w-4 rounded-full bg-green-500" />
+        case 'location':
+          return <MapPin className="h-4 w-4 text-orange-600" />
+        case 'project':
+          return <Briefcase className="h-4 w-4 text-red-600" />
+        default:
+          return <div className="h-4 w-4 rounded-full bg-gray-400" />
       }
-    })
-  }
+    }
 
-  const buildLocationTree = (): OrgNode[] => {
-    const locations = [...new Set(employees.map((e) => e.office_location).filter(Boolean))]
-
-    return locations.map((location) => {
-      const locationEmployees = employees.filter((e) => e.office_location === location)
-      const locationTeams = teams.filter(
-        (t) => t.location === location || locationEmployees.some((emp) => emp.team_id === t.id),
-      )
-
-      const teamNodes: OrgNode[] = locationTeams.map((team) => {
-        const teamMembers = locationEmployees.filter((e) => e.team_id === team.id)
-        const teamLead = teamMembers.find((e) => e.id === team.team_lead_id)
-
-        const memberNodes: OrgNode[] = teamMembers
-          .filter((e) => e.id !== team.team_lead_id)
-          .map((emp) => ({
-            id: emp.id,
-            name: emp.name,
-            value: `${emp.name} - ${emp.job_title || "Employee"}`,
-            symbolSize: selectedEmployee === emp.id ? 40 : 30,
-            itemStyle: {
-              color: selectedEmployee === emp.id ? "#ef4444" : "#10b981",
-              borderColor: selectedEmployee === emp.id ? "#dc2626" : "#059669",
-              borderWidth: selectedEmployee === emp.id ? 3 : 1,
-            },
-            category: 2,
-          }))
-
-        return {
-          id: `${location}-${team.id}`,
-          name: team.name,
-          value: `${team.name} (${teamMembers.length} members)`,
-          symbolSize: 40,
-          itemStyle: { color: "#3b82f6" },
-          category: 1,
-          children: [
-            ...(teamLead
-              ? [
-                  {
-                    id: teamLead.id,
-                    name: teamLead.name,
-                    value: `${teamLead.name} (Team Lead)`,
-                    symbolSize: selectedEmployee === teamLead.id ? 45 : 35,
-                    itemStyle: {
-                      color: selectedEmployee === teamLead.id ? "#ef4444" : "#f59e0b",
-                      borderColor: selectedEmployee === teamLead.id ? "#dc2626" : "#d97706",
-                      borderWidth: selectedEmployee === teamLead.id ? 3 : 1,
-                    },
-                    category: 1,
-                    children: memberNodes,
-                  },
-                ]
-              : memberNodes),
-          ],
-        }
-      })
-
-      const unassignedEmployees = locationEmployees.filter((e) => !e.team_id)
-      const unassignedNodes: OrgNode[] = unassignedEmployees.map((emp) => ({
-        id: emp.id,
-        name: emp.name,
-        value: `${emp.name} - ${emp.job_title || "Employee"}`,
-        symbolSize: selectedEmployee === emp.id ? 40 : 30,
-        itemStyle: {
-          color: selectedEmployee === emp.id ? "#ef4444" : "#6b7280",
-          borderColor: selectedEmployee === emp.id ? "#dc2626" : "#4b5563",
-          borderWidth: selectedEmployee === emp.id ? 3 : 1,
-        },
-        category: 2,
-      }))
-
-      return {
-        id: location || "remote",
-        name: location || "Remote",
-        value: `${location || "Remote"} (${locationEmployees.length} employees)`,
-        symbolSize: 60,
-        itemStyle: { color: "#f59e0b" },
-        category: 0,
-        children: [...teamNodes, ...unassignedNodes],
+    const getNodeColor = () => {
+      if (isSelected) return "bg-red-50 border-red-200"
+      switch (node.type) {
+        case 'department':
+          return "bg-purple-50 border-purple-200"
+        case 'team':
+          return "bg-blue-50 border-blue-200"
+        case 'employee':
+          return "bg-green-50 border-green-200"
+        case 'location':
+          return "bg-orange-50 border-orange-200"
+        case 'project':
+          return "bg-red-50 border-red-200"
+        default:
+          return "bg-gray-50 border-gray-200"
       }
-    })
-  }
+    }
 
-  const buildProjectTree = (): OrgNode[] => {
-    const projects = [
-      { id: "operations", name: "Operations Projects", departments: ["Operations"] },
-      { id: "safety", name: "Safety Initiatives", departments: ["Safety"] },
-      { id: "maintenance", name: "Maintenance Programs", departments: ["Maintenance"] },
-      { id: "finance", name: "Finance & Billing", departments: ["Billing Payroll"] },
-      { id: "cross-functional", name: "Cross-Functional Teams", departments: ["Operations", "Safety", "Maintenance"] },
-    ]
-
-    return projects.map((project) => {
-      let projectEmployees: Employee[] = []
-
-      if (project.id === "cross-functional") {
-        const managers = employees.filter((e) => employees.some((emp) => emp.manager_id === e.id))
-        const teamLeads = employees.filter((e) => teams.some((t) => t.team_lead_id === e.id))
-        projectEmployees = [...new Set([...managers, ...teamLeads])]
-      } else {
-        projectEmployees = employees.filter((e) => project.departments.includes(e.department || ""))
-      }
-
-      const roleGroups = new Map<string, Employee[]>()
-
-      projectEmployees.forEach((emp) => {
-        const role = emp.job_title || "General"
-        if (!roleGroups.has(role)) {
-          roleGroups.set(role, [])
-        }
-        roleGroups.get(role)!.push(emp)
-      })
-
-      const roleNodes: OrgNode[] = Array.from(roleGroups.entries()).map(([role, employees]) => {
-        const employeeNodes: OrgNode[] = employees.map((emp) => ({
-          id: `${project.id}-${emp.id}`,
-          name: emp.name,
-          value: `${emp.name} (${emp.department})`,
-          symbolSize: selectedEmployee === emp.id ? 40 : 30,
-          itemStyle: {
-            color: selectedEmployee === emp.id ? "#ef4444" : "#10b981",
-            borderColor: selectedEmployee === emp.id ? "#dc2626" : "#059669",
-            borderWidth: selectedEmployee === emp.id ? 3 : 1,
-          },
-          category: 2,
-        }))
-
-        return {
-          id: `${project.id}-${role}`,
-          name: role,
-          value: `${role} (${employees.length})`,
-          symbolSize: 40,
-          itemStyle: { color: "#8b5cf6" },
-          category: 1,
-          children: employeeNodes,
-        }
-      })
-
-      return {
-        id: project.id,
-        name: project.name,
-        value: `${project.name} (${projectEmployees.length} members)`,
-        symbolSize: 50,
-        itemStyle: {
-          color: project.id === "cross-functional" ? "#ef4444" : "#3b82f6",
-        },
-        category: 0,
-        children: roleNodes,
-      }
-    })
-  }
-
-  const chartOption = {
-    tooltip: {
-      trigger: "item",
-      triggerOn: "mousemove",
-      formatter: (params: any) => `<strong>${params.name}</strong><br/>${params.value}`,
-    },
-    toolbox: {
-      show: true,
-      feature: {
-        restore: { show: true },
-        saveAsImage: { show: true },
-      },
-    },
-    series: [
-      {
-        type: "tree",
-        data: buildOrgTree(),
-        top: "5%",
-        left: "7%",
-        bottom: "5%",
-        right: "20%",
-        symbolSize: 7,
-        label: {
-          position: "left",
-          verticalAlign: "middle",
-          align: "right",
-          fontSize: 12,
-          color: "#374151",
-        },
-        leaves: {
-          label: {
-            position: "right",
-            verticalAlign: "middle",
-            align: "left",
-          },
-        },
-        emphasis: {
-          focus: "descendant",
-        },
-        expandAndCollapse: true,
-        animationDuration: 550,
-        animationDurationUpdate: 750,
-        itemStyle: {
-          color: "#3b82f6",
-          borderColor: "#1e40af",
-          borderWidth: 1,
-        },
-        lineStyle: {
-          color: "#9ca3af",
-          width: 1,
-          curveness: 0.5,
-        },
-      },
-    ],
+    return (
+      <div key={node.id} className="space-y-1">
+        <div
+          className={`
+            flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors
+            hover:shadow-sm ${getNodeColor()}
+          `}
+          onClick={() => {
+            if (hasChildren) {
+              toggleNode(node.id)
+            } else if (node.employee) {
+              window.open(`/employees/${node.employee.id}`, "_blank")
+            }
+          }}
+        >
+          <div className="flex items-center gap-1" style={{ marginLeft: `${level * 20}px` }}>
+            {hasChildren && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleNode(node.id)
+                }}
+                className="p-1 hover:bg-gray-200 rounded"
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
+              </button>
+            )}
+            {getNodeIcon()}
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-sm truncate">{node.name}</div>
+            {node.data.jobTitle && (
+              <div className="text-xs text-gray-600 truncate">{node.data.jobTitle}</div>
+            )}
+            {node.data.memberCount && (
+              <div className="text-xs text-gray-500">{node.data.memberCount} members</div>
+            )}
+            {node.data.employeeCount && (
+              <div className="text-xs text-gray-500">{node.data.employeeCount} employees</div>
+            )}
+          </div>
+          
+          {node.employee && (
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.open(`/employees/${node.employee!.id}`, "_blank")
+                }}
+              >
+                <Eye className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+        </div>
+        
+        {isExpanded && hasChildren && (
+          <div className="ml-4 border-l-2 border-gray-200 pl-4">
+            {node.children.map((child) => renderTreeNode(child, level + 1))}
+          </div>
+        )}
+      </div>
+    )
   }
 
   const filteredEmployees = employees.filter(
@@ -457,120 +451,18 @@ export default function OrgChartPage() {
   )
 
   const handleExportPNG = useCallback(() => {
-    if (!chartInstance) {
-      toast({
-        title: "Export Error",
-        description: "Chart not ready for export. Please wait for the chart to load.",
-        variant: "destructive",
-      })
-      return
-    }
+    toast({
+      title: "Export Feature",
+      description: "PNG export will be implemented in the next update.",
+    })
+  }, [toast])
 
-    setExportingPNG(true)
-    try {
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-")
-      const fileName = `org-chart-${selectedView}-${timestamp}.png`
-
-      const dataURL = chartInstance.getDataURL({
-        type: "png",
-        pixelRatio: 2,
-        backgroundColor: "#ffffff",
-      })
-
-      const link = document.createElement("a")
-      link.download = fileName
-      link.href = dataURL
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      toast({
-        title: "Export Successful",
-        description: `Organizational chart exported as ${fileName}`,
-      })
-    } catch (error) {
-      console.error("PNG export failed:", error)
-      toast({
-        title: "Export Failed",
-        description: "Failed to export chart as PNG. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setExportingPNG(false)
-    }
-  }, [chartInstance, selectedView, toast])
-
-  const handleExportPDF = useCallback(async () => {
-    if (!chartInstance) {
-      toast({
-        title: "Export Error",
-        description: "Chart not ready for export. Please wait for the chart to load.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setExportingPDF(true)
-    try {
-      const jsPDF = (await import("jspdf")).default
-
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-")
-      const fileName = `org-chart-${selectedView}-${timestamp}.pdf`
-
-      const dataURL = chartInstance.getDataURL({
-        type: "png",
-        pixelRatio: 2,
-        backgroundColor: "#ffffff",
-      })
-
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      })
-
-      pdf.setFontSize(16)
-      pdf.text(`Organizational Chart - ${selectedView.charAt(0).toUpperCase() + selectedView.slice(1)} View`, 20, 20)
-
-      pdf.setFontSize(10)
-      pdf.text(`Generated on: ${new Date().toLocaleString()}`, 20, 30)
-
-      const imgWidth = 250
-      const imgHeight = 150
-      pdf.addImage(dataURL, "PNG", 20, 40, imgWidth, imgHeight)
-
-      pdf.setFontSize(12)
-      let yPos = 200
-      pdf.text("Organization Summary:", 20, yPos)
-      yPos += 10
-      pdf.setFontSize(10)
-      pdf.text(`Total Employees: ${stats.totalEmployees}`, 20, yPos)
-      yPos += 5
-      pdf.text(`Departments: ${stats.departments}`, 20, yPos)
-      yPos += 5
-      pdf.text(`Teams: ${stats.teams}`, 20, yPos)
-      yPos += 5
-      pdf.text(`Locations: ${stats.locations}`, 20, yPos)
-      yPos += 5
-      pdf.text(`Managers: ${stats.managers}`, 20, yPos)
-
-      pdf.save(fileName)
-
-      toast({
-        title: "Export Successful",
-        description: `Organizational chart exported as ${fileName}`,
-      })
-    } catch (error) {
-      console.error("PDF export failed:", error)
-      toast({
-        title: "Export Failed",
-        description: "Failed to export chart as PDF. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setExportingPDF(false)
-    }
-  }, [chartInstance, selectedView, toast])
+  const handleExportPDF = useCallback(() => {
+    toast({
+      title: "Export Feature",
+      description: "PDF export will be implemented in the next update.",
+    })
+  }, [toast])
 
   return (
     <div className="space-y-6">
@@ -584,19 +476,19 @@ export default function OrgChartPage() {
             variant="outline"
             size="sm"
             onClick={handleExportPNG}
-            disabled={exportingPNG || loading || !chartInstance}
+            disabled={loading}
           >
             <FileImage className="h-4 w-4 mr-2" />
-            {exportingPNG ? "Exporting..." : "Export PNG"}
+            Export PNG
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={handleExportPDF}
-            disabled={exportingPDF || loading || !chartInstance}
+            disabled={loading}
           >
             <FileText className="h-4 w-4 mr-2" />
-            {exportingPDF ? "Exporting..." : "Export PDF"}
+            Export PDF
           </Button>
         </div>
       </div>
@@ -669,30 +561,7 @@ export default function OrgChartPage() {
                 className="pl-10"
               />
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleZoomIn}>
-                <ZoomIn className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleZoomOut}>
-                <ZoomOut className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleResetView}>
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            </div>
           </div>
-
-          {breadcrumbs.length > 0 && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-              <Navigation className="h-4 w-4" />
-              {breadcrumbs.map((crumb, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  {index > 0 && <span>→</span>}
-                  <Badge variant="outline">{crumb}</Badge>
-                </div>
-              ))}
-            </div>
-          )}
 
           {searchTerm && (
             <div className="mt-4 space-y-2">
@@ -708,7 +577,6 @@ export default function OrgChartPage() {
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => handleSearch(emp.name)}>
-                        <Navigation className="h-4 w-4 mr-1" />
                         Locate
                       </Button>
                       <Link href={`/employees/${emp.id}`}>
@@ -748,23 +616,8 @@ export default function OrgChartPage() {
               <p className="text-muted-foreground">Loading organizational chart...</p>
             </div>
           ) : (
-            <div className="w-full">
-              <ReactECharts
-                option={chartOption}
-                style={{ height: 600 }}
-                notMerge={true}
-                lazyUpdate={true}
-                onChartReady={(instance) => {
-                  if (!chartInstance) setChartInstance(instance)
-                }}
-                onEvents={{
-                  click: (params: any) => {
-                    if (params.data && employees.find((e) => e.id === params.data.id)) {
-                      window.open(`/employees/${params.data.id}`, "_blank")
-                    }
-                  },
-                }}
-              />
+            <div className="space-y-2 max-h-[600px] overflow-y-auto">
+              {buildOrgTree().map((node) => renderTreeNode(node))}
             </div>
           )}
         </CardContent>

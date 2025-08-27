@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { CheckCircle2, FileText, User, X } from "lucide-react"
+import { CheckCircle2, FileText, User, X, UserPlus } from "lucide-react"
 import type { Candidate, CandidateStatus, CandidateStatusOption } from "@/lib/types"
 
 type Props = {
@@ -33,6 +33,12 @@ export function CandidateDrawer({
   React.useEffect(() => {
     setNotes(candidate?.notes || "")
   }, [candidate])
+
+  // Check if employee has already been created by looking for the marker in notes
+  const hasEmployeeBeenCreated = React.useMemo(() => {
+    if (!candidate?.notes) return false
+    return candidate.notes.includes("--- EMPLOYEE CREATED ---")
+  }, [candidate?.notes])
 
   async function updateRecommendation(rec: CandidateStatus) {
     if (!candidate) return
@@ -166,6 +172,25 @@ export function CandidateDrawer({
 
   const recommendationOrder: CandidateStatus[] = ["Call Immediatley", "Remove", "Shortlist"]
 
+  const handleMarkAsHired = async () => {
+    if (!candidate) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/candidates/${candidate.id}/mark-as-hired`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+      if (!res.ok) {
+        console.error("Failed to mark as hired", await res.text())
+      } else {
+        await onUpdated()
+        onClose()
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Sheet
       open={!!candidate}
@@ -295,24 +320,21 @@ export function CandidateDrawer({
                       ))}
                     </SelectContent>
                   </Select>
+                  
+                  {/* Mark as Hired Button */}
+                  {candidate.status?.name === 'Hired' && (
+                    <Button 
+                      onClick={handleMarkAsHired}
+                      disabled={saving || hasEmployeeBeenCreated}
+                      className="w-full"
+                      variant={hasEmployeeBeenCreated ? "secondary" : "default"}
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      {hasEmployeeBeenCreated ? "Employee Profile Created" : "Create Employee Profile"}
+                    </Button>
+                  )}
                 </div>
               )}
-
-              {/* Legacy Recommendation Actions */}
-              <div className="grid grid-cols-2 gap-2">
-                {recommendationOrder.map((rec) => (
-                  <Button
-                    key={rec}
-                    variant={"secondary"}
-                    className={"bg-neutral-100 text-neutral-900 hover:bg-neutral-200"}
-                    onClick={() => updateRecommendation(rec)}
-                    disabled={saving}
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    {rec}
-                  </Button>
-                ))}
-              </div>
               
               {candidate.cv_link && (
                 <a

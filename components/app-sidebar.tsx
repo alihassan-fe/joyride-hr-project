@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Bot, Calendar, FileText, LayoutDashboard, LogOut, Megaphone, UserPlus, Users, User, MapIcon as Sitemap, Clock } from "lucide-react"
+import { Bot, Calendar, FileText, LayoutDashboard, LogOut, Megaphone, UserPlus, Users, User, MapIcon as Sitemap, Clock, Settings } from "lucide-react"
 import { signOut } from "next-auth/react"
 
 type Props = {
@@ -30,12 +30,15 @@ const navItems = [
   { href: "/applicants", label: "Applicants", icon: FileText },
   { href: "/employees", label: "Employees", icon: Users },
   { href: "/shifts", label: "Shifts", icon: Clock },
-  { href: "/org-chart", label: "Org Chart", icon: Sitemap },
+  { href: "/org-chart", label: "Organization Chart", icon: Sitemap },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/profile", label: "Profile", icon: User },
 ]
 
-const adminNavItems = [{ href: "/admin/users", label: "Admin Users", icon: UserPlus }]
+const adminNavItems = [
+  { href: "/admin/users", label: "Admin Users", icon: UserPlus },
+  { href: "/admin/status-management", label: "Status Management", icon: Settings }
+]
 
 export function AppSidebar({ user = { email: "user@example.com", role: "Authenticated" } }: Props) {
   const pathname = usePathname()

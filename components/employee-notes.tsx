@@ -7,15 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { StickyNote, Plus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-
-interface Note {
-  id: number
-  employee_id: string
-  note: string
-  note_text: string
-  created_by: string
-  created_at: string
-}
+import type { Note } from "@/lib/types"
 
 interface EmployeeNotesProps {
   employeeId: string
@@ -48,7 +40,6 @@ export function EmployeeNotes({ employeeId, notes, onNotesChange }: EmployeeNote
         body: JSON.stringify({
           note: newNote.trim(),
           note_text: newNote.trim(), // Assuming note_text is the same as note
-          created_by: employeeId, // TODO: Get from session
         }),
       })
 
@@ -100,16 +91,19 @@ export function EmployeeNotes({ employeeId, notes, onNotesChange }: EmployeeNote
 
         {/* Notes List */}
         <div className="space-y-3">
+          <h3 className="font-medium">Previous Notes</h3>
           {notes.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No notes added yet</p>
+            <p className="text-muted-foreground text-sm">No notes yet</p>
           ) : (
             notes.map((note) => (
-              <div key={note.id} className="p-3 border rounded-lg bg-muted/50">
-                <p className="text-sm mb-2">{note.note}</p>
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>By: {note.created_by}</span>
-                  <span>{new Date(note.created_at).toLocaleString()}</span>
-                </div>
+              <div key={note.id} className="p-3 border rounded-lg">
+                <p className="text-sm">
+                  {note.note_text || note.note || "No content"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {new Date(note.created_at).toLocaleDateString()}
+                  {note.created_by && ` • by ${note.created_by}`}
+                </p>
               </div>
             ))
           )}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -212,7 +212,7 @@ export function ShiftCalendar({ employees }: ShiftCalendarProps) {
   const renderWeeklyView = () => {
     const startDate = new Date(getStartDate())
     const days: string[] = []
-    
+     console.log("days", days )
     for (let i = 0; i < 7; i++) {
       const date = new Date(startDate)
       date.setDate(startDate.getDate() + i)
@@ -223,7 +223,9 @@ export function ShiftCalendar({ employees }: ShiftCalendarProps) {
       <div className="overflow-x-auto">
       <div className="min-w-[800px]">
         {/* Grid: (1 col for Time + N cols for days) */}
-        <div className={`grid grid-cols-${days.length + 1} border`}>
+        <div className={`grid border`}
+          style={{ gridTemplateColumns: `repeat(${days.length + 1}, minmax(0, 1fr))` }}
+        >
           
           {/* Header row */}
           <div className="p-2 font-medium text-sm border-r">Time</div>
@@ -242,10 +244,9 @@ export function ShiftCalendar({ employees }: ShiftCalendarProps) {
     
           {/* Shift rows */}
           {shiftTypes.map(shiftType => (
-            <>
+            <React.Fragment key={shiftType.id}>
               {/* Left column: Shift name */}
               <div
-                key={shiftType.id}
                 className="p-2 text-sm font-medium border-t border-r"
               >
                 {shiftType.name}
@@ -276,7 +277,7 @@ export function ShiftCalendar({ employees }: ShiftCalendarProps) {
                   </div>
                 );
               })}
-            </>
+            </React.Fragment>
           ))}
         </div>
       </div>
