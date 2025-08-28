@@ -120,12 +120,12 @@ export default function EmployeeOverviewTab({
                 </div>
               )}
 
-              {employee.age && (
+              {employee.location && (
                 <div className="flex items-center gap-3">
-                  <User className="h-4 w-4 text-muted-foreground" />
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-sm font-medium">Age</p>
-                    <p className="text-sm text-muted-foreground">{employee.age} years old</p>
+                    <p className="text-sm font-medium">Location</p>
+                    <p className="text-sm text-muted-foreground">{employee.location}</p>
                   </div>
                 </div>
               )}
@@ -196,15 +196,6 @@ export default function EmployeeOverviewTab({
                 </div>
               </div>
 
-              {employee.location && (
-                <div className="flex items-center gap-3">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Location</p>
-                    <p className="text-sm text-muted-foreground">{employee.location}</p>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 

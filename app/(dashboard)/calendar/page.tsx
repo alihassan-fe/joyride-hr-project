@@ -335,8 +335,6 @@ export default function CalendarPage() {
     setShowEventDialog(true)
   }
 
-
-
   const groupPTORequests = () => {
     const now = new Date()
     const today = now.toISOString().split('T')[0]
@@ -367,10 +365,10 @@ export default function CalendarPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setShowInterviewDialog(true)}>
+          {/* <Button onClick={() => setShowInterviewDialog(true)}>
             <Calendar className="w-4 h-4 mr-2" />
             Schedule Interview
-          </Button>
+          </Button> */}
           <Button onClick={() => setShowPTODialog(true)} variant="outline">
             <Users className="w-4 h-4 mr-2" />
             Add PTO
@@ -571,8 +569,19 @@ export default function CalendarPage() {
                       <TableCell className="font-medium">{pto.employee_name}</TableCell>
                       <TableCell>{pto.department}</TableCell>
                       <TableCell>
-                        {pto.start_date} - {pto.end_date}
-                      </TableCell>
+  {new Date(pto.start_date).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })}{" "}
+  -{" "}
+  {new Date(pto.end_date).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })}
+</TableCell>
+
                       <TableCell>{pto.days_requested}</TableCell>
                       <TableCell>
                         <Badge className={statusBadge[pto.status as keyof typeof statusBadge]}>

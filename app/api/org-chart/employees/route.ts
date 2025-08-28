@@ -7,7 +7,7 @@ export async function GET() {
     const employees = await sql`
       SELECT 
         id, name, email, job_title, department, manager_id, 
-        office_location, employment_status, team_id
+        location, employment_status, team_id
       FROM employees 
       WHERE employment_status = 'active'
       ORDER BY department, name

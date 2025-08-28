@@ -5,14 +5,14 @@ import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import NewEmployeeDialog from "@/components/new-employee-dialog"
 import EditEmployeeDialog from "@/components/edit-employee-dialog"
 import { useToast } from "@/hooks/use-toast"
-import { Trash2, Pencil, Eye, StickyNote } from "lucide-react"
+import { Trash2, Pencil, Eye, StickyNote, Filter } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Employee } from "@/lib/types"
-
 
 export default function EmployeesPage() {
   const { toast } = useToast()
@@ -20,10 +20,39 @@ export default function EmployeesPage() {
   const isAdmin = (session?.user as any)?.role === "Admin"
 
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([])
+  const [statusFilter, setStatusFilter] = useState<string>("all")
   console.log("ef", employees)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Employee | null>(null)
   const [deleting, setDeleting] = useState<Employee | null>(null)
+
+  // Filter employees based on status
+  useEffect(() => {
+    if (statusFilter === "all") {
+      setFilteredEmployees(employees)
+    } else {
+      setFilteredEmployees(employees.filter(emp => emp.employment_status === statusFilter))
+    }
+  }, [employees, statusFilter])
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return "bg-green-100 text-green-800"
+      case 'inactive': return "bg-yellow-100 text-yellow-800"
+      case 'terminated': return "bg-red-100 text-red-800"
+      default: return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getStatusBadge = (employee: Employee) => {
+    const status = employee.employment_status || 'active'
+    return (
+      <Badge className={getStatusColor(status)}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    )
+  }
 
  const fetchEmployees = async () => {
     try {
@@ -111,12 +140,35 @@ export default function EmployeesPage() {
           {isAdmin && <NewEmployeeDialog onCreated={fetchEmployees} />}
         </CardHeader>
         <CardContent>
+          {/* Filter Section */}
+          <div className="flex items-center gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Filter by Status:</span>
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Employees" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Employees</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="terminated">Terminated</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="text-sm text-muted-foreground">
+              Showing {filteredEmployees.length} of {employees.length} employees
+            </div>
+          </div>
+
           <div className="border rounded-md overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-          <TableHead>Employee</TableHead>
+                  <TableHead>Employee</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Start Date</TableHead>
                   <TableHead>Documents</TableHead>
                   <TableHead>Notes</TableHead>
@@ -124,20 +176,21 @@ export default function EmployeesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {employees.map((e) => (
+                {filteredEmployees.map((e) => (
                   <TableRow key={e.id}>
-                 <TableCell>
+                    <TableCell>
                       <div>
                         <p className="font-medium">{e.name}</p>
                         <p className="text-sm text-muted-foreground">{e.email}</p>
                       </div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">{e.role}</TableCell>
+                    <TableCell>{getStatusBadge(e)}</TableCell>
                     <TableCell className="whitespace-nowrap">
                       {e.start_date ? new Date(e.start_date).toLocaleDateString() : "-"}
                     </TableCell>
-                                <TableCell>{getDocumentStatus(e.document_count || 0)}</TableCell>
-                        <TableCell>
+                    <TableCell>{getDocumentStatus(e.document_count || 0)}</TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-1">
                         <StickyNote className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm">{e.notes_count || 0}</span>
@@ -145,7 +198,7 @@ export default function EmployeesPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                           <Link href={`/employees/${e.id}`}>
+                        <Link href={`/employees/${e.id}`}>
                           <Button variant="outline" size="sm">
                             <Eye className="mr-1 h-4 w-4" />
                             Profile
@@ -167,10 +220,10 @@ export default function EmployeesPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {employees.length === 0 && (
+                {filteredEmployees.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                      {loading ? "Loading..." : "No employees found"}
+                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                      {loading ? "Loading..." : `No ${statusFilter === 'all' ? '' : statusFilter} employees found`}
                     </TableCell>
                   </TableRow>
                 )}

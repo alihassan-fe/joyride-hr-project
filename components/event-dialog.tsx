@@ -52,6 +52,7 @@ export function EventDialog({
 }: EventDialogProps) {
   const [draft, setDraft] = useState<any>({})
   const [selectedAttendees, setSelectedAttendees] = useState<Attendee[]>([])
+  console.log("🚀 ~ EventDialog ~ selectedAttendees:", selectedAttendees)
   const [attendeeSearchQuery, setAttendeeSearchQuery] = useState("")
   const [attendeeSearchResults, setAttendeeSearchResults] = useState<Attendee[]>([])
   const [showAttendeeSearchResults, setShowAttendeeSearchResults] = useState(false)
@@ -62,8 +63,28 @@ export function EventDialog({
   // Initialize draft when event changes
   useEffect(() => {
     if (event) {
-      setDraft(event)
-      setSelectedAttendees(event.attendees || [])
+      // Format dates for datetime-local inputs
+      const formatDateForInput = (dateString: string) => {
+        if (!dateString) return ""
+        const date = new Date(dateString)
+        // Format as YYYY-MM-DDTHH:mm for datetime-local input
+        return date.toISOString().slice(0, 16)
+      }
+
+      setDraft({
+        ...event,
+        start: formatDateForInput(event.start_time || event.start),
+        end: formatDateForInput(event.end_time || event.end)
+      })
+      
+      // Map database attendees to the expected format
+      const mappedAttendees = (event.attendees || []).map((attendee: any) => ({
+        id: attendee.attendee_id || attendee.id,
+        name: attendee.attendee_name || attendee.name,
+        email: attendee.attendee_email || attendee.email,
+        type: (attendee.attendee_type || attendee.type) as 'employee' | 'candidate'
+      }))
+      setSelectedAttendees(mappedAttendees)
     } else {
       setDraft({})
       setSelectedAttendees([])
@@ -238,8 +259,8 @@ export function EventDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          eventId: draft.id,
-          attendees: selectedAttendees.map(a => a.email)
+          event_id: draft.id,
+          recipients: selectedAttendees.map(a => a.email)
         }),
       })
 

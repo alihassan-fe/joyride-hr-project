@@ -76,7 +76,7 @@ export interface Employee {
   updated_at?: string
   // Legacy fields for backward compatibility
   job_title?: string
-  office_location?: string
+  location?: string
   team_id?: string
   current_performance_score?: number
   // Manager information
@@ -183,6 +183,9 @@ export interface EmployeeActivityLog {
   ip_address?: string
   user_agent?: string
   created_at: string
+  // Actor information from users table
+  actor_name?: string
+  actor_email?: string
   // Related data
   employee?: Employee
   actor?: Employee

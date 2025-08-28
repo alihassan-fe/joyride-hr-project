@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { 
   DropdownMenu, 
@@ -85,6 +85,41 @@ export default function EmployeeActions({ employee }: EmployeeActionsProps) {
     }
   }
 
+  const handleReactivate = async () => {
+    if (!employee.id) return
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/employees/${employee.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employment_status: "Active"
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Employee Reactivated",
+          description: `${employee.name} has been reactivated successfully.`,
+        })
+        // Refresh the page to update the status
+        window.location.reload()
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to reactivate employee")
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reactivate employee",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleRemove = async () => {
     if (!employee.id) return
 
@@ -152,7 +187,7 @@ export default function EmployeeActions({ employee }: EmployeeActionsProps) {
     }
   }
 
-  const isArchived = employee.employment_status === "Archived"
+  const isArchived = employee.employment_status === "inactive"
 
   return (
     <>
@@ -176,7 +211,7 @@ export default function EmployeeActions({ employee }: EmployeeActionsProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setShowMeetingDialog(true)}>
+            <DropdownMenuItem onSelect={() => setShowMeetingDialog(true)}>
               <Calendar className="h-4 w-4 mr-2" />
               Schedule HR Meeting
             </DropdownMenuItem>
@@ -185,7 +220,7 @@ export default function EmployeeActions({ employee }: EmployeeActionsProps) {
             
             {!isArchived ? (
               <DropdownMenuItem 
-                onClick={() => setShowArchiveDialog(true)}
+              onSelect={() => setShowArchiveDialog(true)}
                 className="text-amber-600"
               >
                 <Archive className="h-4 w-4 mr-2" />
@@ -193,16 +228,16 @@ export default function EmployeeActions({ employee }: EmployeeActionsProps) {
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem 
-                onClick={() => handleArchive()}
+              onSelect={handleReactivate}
                 className="text-green-600"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Restore Employee
+                Reactivate Employee
               </DropdownMenuItem>
             )}
             
             <DropdownMenuItem 
-              onClick={() => setShowRemoveDialog(true)}
+              onSelect={() => setShowRemoveDialog(true)}
               className="text-red-600"
             >
               <Trash2 className="h-4 w-4 mr-2" />
@@ -323,6 +358,23 @@ function ScheduleMeetingDialog({ open, onOpenChange, employee, onSubmit, loading
     notes: ""
   })
 
+  // Reset form when dialog opens/closes
+  useEffect(() => {
+    if (!open) {
+      setFormData({
+        meeting_type: "HR_Review",
+        title: "",
+        description: "",
+        scheduled_date: "",
+        scheduled_time: "",
+        duration_minutes: "60",
+        location: "",
+        generate_google_meet: true,
+        notes: ""
+      })
+    }
+  }, [open])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const scheduledDateTime = new Date(`${formData.scheduled_date}T${formData.scheduled_time}`)
@@ -332,6 +384,10 @@ function ScheduleMeetingDialog({ open, onOpenChange, employee, onSubmit, loading
       scheduled_date: scheduledDateTime.toISOString(),
       duration_minutes: parseInt(formData.duration_minutes)
     })
+  }
+
+  const handleClose = () => {
+    onOpenChange(false)
   }
 
   return (

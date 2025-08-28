@@ -45,7 +45,7 @@ export default function OrgChartPage() {
     totalEmployees: employees.length,
     departments: [...new Set(employees.map((e) => e.department).filter(Boolean))].length,
     teams: teams.length,
-    locations: [...new Set(employees.map((e) => e.office_location).filter(Boolean))].length,
+    locations: [...new Set(employees.map((e) => e.location).filter(Boolean))].length,
     managers: employees.filter((e) => employees.some((emp) => emp.manager_id === e.id)).length,
   }
 
@@ -113,8 +113,8 @@ export default function OrgChartPage() {
     }
     
     // Expand location
-    if (employee.office_location) {
-      newExpanded.add(`loc-${employee.office_location}`)
+    if (employee.location) {
+      newExpanded.add(`loc-${employee.location}`)
     }
     
     setExpandedNodes(newExpanded)
@@ -196,10 +196,10 @@ export default function OrgChartPage() {
   }
 
   const buildLocationTree = (): TreeNode[] => {
-    const locations = [...new Set(employees.map((e) => e.office_location).filter(Boolean))]
+    const locations = [...new Set(employees.map((e) => e.location).filter(Boolean))]
     
     return locations.map((location) => {
-      const locationEmployees = employees.filter((e) => e.office_location === location)
+      const locationEmployees = employees.filter((e) => e.location === location)
       const locationTeams = teams.filter(
         (t) => t.location === location || locationEmployees.some((emp) => emp.team_id === t.id),
       )
@@ -471,7 +471,7 @@ export default function OrgChartPage() {
           <h1 className="text-2xl font-semibold">Organizational Chart</h1>
           <p className="text-sm text-muted-foreground">Visualize your team structure and hierarchy</p>
         </div>
-        <div className="flex items-center gap-2">
+        {/* <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -490,10 +490,10 @@ export default function OrgChartPage() {
             <FileText className="h-4 w-4 mr-2" />
             Export PDF
           </Button>
-        </div>
+        </div> */}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <Card className="rounded-2xl shadow-md">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -536,15 +536,6 @@ export default function OrgChartPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.locations}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl shadow-md">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Managers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.managers}</div>
           </CardContent>
         </Card>
       </div>
@@ -629,7 +620,7 @@ export default function OrgChartPage() {
             <CardTitle>View Insights</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               {selectedView === "department" && (
                 <>
                   <div className="p-3 bg-blue-50 rounded-lg">
@@ -645,10 +636,6 @@ export default function OrgChartPage() {
                       {stats.teams} teams across {stats.departments} departments
                     </p>
                   </div>
-                  <div className="p-3 bg-purple-50 rounded-lg">
-                    <p className="font-medium text-purple-900">Hierarchy Depth</p>
-                    <p className="text-purple-700">3-4 levels (Department → Team → Lead → Members)</p>
-                  </div>
                 </>
               )}
 
@@ -661,7 +648,7 @@ export default function OrgChartPage() {
                   <div className="p-3 bg-teal-50 rounded-lg">
                     <p className="font-medium text-teal-900">Remote Workers</p>
                     <p className="text-teal-700">
-                      {employees.filter((e) => !e.office_location).length} employees working remotely
+                      {employees.filter((e) => !e.location).length} employees working remotely
                     </p>
                   </div>
                   <div className="p-3 bg-indigo-50 rounded-lg">
@@ -670,7 +657,7 @@ export default function OrgChartPage() {
                       {(() => {
                         const locationCounts = employees.reduce(
                           (acc, emp) => {
-                            const loc = emp.office_location || "Remote"
+                            const loc = emp.location || "Remote"
                             acc[loc] = (acc[loc] || 0) + 1
                             return acc
                           },
@@ -701,10 +688,6 @@ export default function OrgChartPage() {
                       }{" "}
                       employees in leadership roles
                     </p>
-                  </div>
-                  <div className="p-3 bg-yellow-50 rounded-lg">
-                    <p className="font-medium text-yellow-900">Project Teams</p>
-                    <p className="text-yellow-700">5 project areas with matrix assignments</p>
                   </div>
                   <div className="p-3 bg-pink-50 rounded-lg">
                     <p className="font-medium text-pink-900">Role Diversity</p>

@@ -139,10 +139,10 @@ async function getEmployeeActivityLog(employeeId: string): Promise<EmployeeActiv
       SELECT 
         eal.id, eal.employee_id, eal.actor_id, eal.action_type, eal.action_details,
         eal.ip_address, eal.user_agent, eal.created_at,
-        -- Actor information
-        a.name as actor_name, a.email as actor_email
+        -- Actor information (join with users table since actor_id references users)
+        u.name as actor_name, u.email as actor_email
       FROM employee_activity_log eal
-      LEFT JOIN employees a ON eal.actor_id = a.id
+      LEFT JOIN users u ON eal.actor_id = u.id
       WHERE eal.employee_id = ${employeeId}
       ORDER BY eal.created_at DESC
       LIMIT 100

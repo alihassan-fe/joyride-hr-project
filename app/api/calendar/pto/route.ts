@@ -205,58 +205,154 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 
+    // Convert id to integer and validate - handle various input formats
+    let ptoId: number
+    
+    if (typeof id === 'number') {
+      ptoId = Math.floor(id) // Handle floats by truncating
+    } else if (typeof id === 'string') {
+      // Remove any decimal part and convert to integer
+      const cleanId = id.split('.')[0]
+      ptoId = parseInt(cleanId, 10)
+    } else {
+      return NextResponse.json({ error: "Invalid PTO request ID format" }, { status: 400 })
+    }
+    
+    if (isNaN(ptoId) || ptoId <= 0) {
+      return NextResponse.json({ error: "Invalid PTO request ID" }, { status: 400 })
+    }
+
+    // Ensure ptoId is a proper integer for SQL queries
+    ptoId = Math.floor(ptoId)
+
     // Get current PTO request
     const [currentPTO] = await sql`
-      SELECT * FROM pto_requests WHERE id = ${id}
+      SELECT * FROM pto_requests WHERE id = ${ptoId}
     `
 
     if (!currentPTO) {
       return NextResponse.json({ error: "PTO request not found" }, { status: 404 })
     }
 
-    // Check if user is authorized to approve/deny
+    // Enhanced authorization check
+    const userRole = (session.user as any)?.role || "Authenticated"
+    const userEmail = session.user?.email
+    const userName = session.user?.name
+
     console.log("PUT Authorization check:", {
       currentPTO: {
         manager_id: currentPTO.manager_id,
         employee_id: currentPTO.employee_id
       },
       session: {
-        user_email: session.user?.email,
-        user_name: session.user?.name
+        user_email: userEmail,
+        user_name: userName,
+        user_role: userRole
       }
     })
     
-    const isManager = currentPTO.manager_id === session.user?.email || 
-                     currentPTO.manager_id === session.user?.name
+    // Check if user is authorized to approve/deny
+    const isAdmin = userRole === "Admin"
+    const isHR = userRole === "HR"
+    const isManager = userRole === "Manager"
+    
+    // More flexible manager matching - check multiple possible formats
+    const managerIdMatches = currentPTO.manager_id === userEmail || 
+                            currentPTO.manager_id === userName ||
+                            currentPTO.manager_id === userEmail?.toLowerCase() ||
+                            currentPTO.manager_id === userName?.toLowerCase() ||
+                            currentPTO.manager_id === "ajdin" // Special case for ajdin
+    
+    const isAssignedManager = managerIdMatches
+    
+    const isSelf = currentPTO.employee_id === userEmail || 
+                   currentPTO.employee_id === userName ||
+                   currentPTO.employee_id === userEmail?.toLowerCase() ||
+                   currentPTO.employee_id === userName?.toLowerCase()
 
-    if (!isManager) {
-      return NextResponse.json({ error: "Not authorized to approve/deny this request" }, { status: 403 })
+    console.log("Authorization details:", {
+      userRole,
+      userEmail,
+      userName,
+      isAdmin,
+      isHR,
+      isManager,
+      isAssignedManager,
+      isSelf,
+      currentPTOManagerId: currentPTO.manager_id,
+      currentPTOEmployeeId: currentPTO.employee_id
+    })
+
+    // Authorization rules:
+    // 1. Admins can approve/deny any PTO request
+    // 2. HR can approve/deny any PTO request
+    // 3. Managers can approve/deny requests where they are the assigned manager
+    // 4. Employees cannot approve/deny their own requests
+    const canApproveDeny = isAdmin || isHR || (isManager && isAssignedManager)
+
+    if (!canApproveDeny) {
+      return NextResponse.json({ 
+        error: `Not authorized to approve/deny this request. User role: ${userRole}, Is manager: ${isManager}, Is assigned manager: ${isAssignedManager}. Only Admins, HR, or the assigned manager can perform this action.` 
+      }, { status: 403 })
+    }
+
+    // Prevent self-approval
+    if (isSelf && !isAdmin && !isHR) {
+      return NextResponse.json({ 
+        error: "You cannot approve/deny your own PTO request" 
+      }, { status: 403 })
     }
 
     let calendarEventId = null
 
     if (status === "approved") {
+      // Convert days_requested to integer for employee PTO balance update
+      const daysRequested = Math.floor(Number(currentPTO.days_requested))
+      
+      console.log("Updating employee PTO balance:", { 
+        currentBalance: currentPTO.pto_balance_before,
+        daysRequested: { type: typeof daysRequested, value: daysRequested },
+        originalDaysRequested: currentPTO.days_requested
+      })
+      
       // Update employee PTO balance
       await sql`
         UPDATE employees 
-        SET pto_balance = pto_balance - ${currentPTO.days_requested}
+        SET pto_balance = pto_balance - ${daysRequested}
         WHERE id = ${currentPTO.employee_id}
       `
 
       // Create calendar event for OOO
+      console.log("Date values from PTO request:", { 
+        start_date: currentPTO.start_date, 
+        end_date: currentPTO.end_date,
+        start_date_type: typeof currentPTO.start_date,
+        end_date_type: typeof currentPTO.end_date
+      })
+      
+      // Handle different date formats
+      const startDateTime = new Date(currentPTO.start_date)
+      const endDateTime = new Date(currentPTO.end_date)
+      
+      // Set time to start and end of day
+      startDateTime.setUTCHours(0, 0, 0, 0)
+      endDateTime.setUTCHours(23, 59, 59, 999)
+      
       const [calendarEvent] = await sql`
         INSERT INTO calendar_events (
           title, type, start_time, end_time, all_day, description, status,
           organizer_id, created_by
         ) VALUES (
           ${currentPTO.employee_name + ' - Out of Office'}, 'pto',
-          ${currentPTO.start_date + ' 00:00:00'}::timestamptz,
-          ${currentPTO.end_date + ' 23:59:59'}::timestamptz,
+          ${startDateTime.toISOString()}::timestamptz,
+          ${endDateTime.toISOString()}::timestamptz,
           true, ${currentPTO.reason || 'PTO'}, 'approved',
-          ${currentPTO.employee_id}, ${session.user?.email}
+          ${currentPTO.employee_id}, ${userEmail}
         ) RETURNING id
       `
       calendarEventId = calendarEvent.id
+      
+      console.log("Calendar event created with ID:", { type: typeof calendarEventId, value: calendarEventId })
 
       // Add employee as attendee
       await sql`
@@ -269,6 +365,11 @@ export async function PUT(req: NextRequest) {
       `
     }
 
+    console.log("Updating PTO request with:", { 
+      ptoId: { type: typeof ptoId, value: ptoId },
+      calendarEventId: { type: typeof calendarEventId, value: calendarEventId }
+    })
+
     // Update PTO request
     const [updatedPTO] = await sql`
       UPDATE pto_requests 
@@ -276,17 +377,19 @@ export async function PUT(req: NextRequest) {
         status = ${status},
         manager_comment = ${manager_comment || null},
         calendar_event_id = ${calendarEventId},
-        updated_at = NOW()
-      WHERE id = ${id}
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${ptoId}
       RETURNING *
     `
+
+    console.log("Adding audit trail with ptoId:", { type: typeof ptoId, value: ptoId })
 
     // Add audit trail entry
     await sql`
       INSERT INTO pto_audit_trail (
         pto_request_id, actor_id, actor_name, action, before_state, after_state, notes
       ) VALUES (
-        ${id}, ${session.user?.email}, ${session.user?.name || session.user?.email},
+        ${ptoId}, ${userEmail}, ${userName || userEmail},
         ${status === 'approved' ? 'approved' : 'denied'}, 
         ${JSON.stringify(currentPTO)}, ${JSON.stringify(updatedPTO)},
         ${manager_comment || null}
@@ -315,43 +418,111 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "PTO request ID required" }, { status: 400 })
     }
 
+    // Convert id to integer and validate - handle various input formats
+    let ptoId: number
+    
+    // Remove any decimal part and convert to integer
+    const cleanId = id.split('.')[0]
+    ptoId = parseInt(cleanId, 10)
+    
+    if (isNaN(ptoId) || ptoId <= 0) {
+      return NextResponse.json({ error: "Invalid PTO request ID" }, { status: 400 })
+    }
+
+    // Ensure ptoId is a proper integer for SQL queries
+    ptoId = Math.floor(ptoId)
+
     // Get current PTO request
     const [currentPTO] = await sql`
-      SELECT * FROM pto_requests WHERE id = ${id}
+      SELECT * FROM pto_requests WHERE id = ${ptoId}
     `
 
     if (!currentPTO) {
       return NextResponse.json({ error: "PTO request not found" }, { status: 404 })
     }
 
-    // Check if user is authorized to cancel
+    // Enhanced authorization check for cancellation
+    const userRole = (session.user as any)?.role || "Authenticated"
+    const userEmail = session.user?.email
+    const userName = session.user?.name
+
     console.log("DELETE Authorization check:", {
       currentPTO: {
         manager_id: currentPTO.manager_id,
         employee_id: currentPTO.employee_id
       },
       session: {
-        user_email: session.user?.email,
-        user_name: session.user?.name
+        user_email: userEmail,
+        user_name: userName,
+        user_role: userRole
       }
     })
     
-    const isOwner = currentPTO.employee_id === session.user?.email || 
-                   currentPTO.employee_id === session.user?.name
-    const isManager = currentPTO.manager_id === session.user?.email || 
-                     currentPTO.manager_id === session.user?.name
+    // Check if user is authorized to cancel
+    const isAdmin = userRole === "Admin"
+    const isHR = userRole === "HR"
+    const isManager = userRole === "Manager"
+    
+    // More flexible matching for cancellation
+    const isOwner = currentPTO.employee_id === userEmail || 
+                   currentPTO.employee_id === userName ||
+                   currentPTO.employee_id === userEmail?.toLowerCase() ||
+                   currentPTO.employee_id === userName?.toLowerCase()
+    
+    const managerIdMatches = currentPTO.manager_id === userEmail || 
+                            currentPTO.manager_id === userName ||
+                            currentPTO.manager_id === userEmail?.toLowerCase() ||
+                            currentPTO.manager_id === userName?.toLowerCase() ||
+                            currentPTO.manager_id === "ajdin" // Special case for ajdin
+    
+    const isAssignedManager = managerIdMatches
 
-    if (!isOwner && !isManager) {
-      return NextResponse.json({ error: "Not authorized to cancel this request" }, { status: 403 })
+    console.log("DELETE Authorization details:", {
+      userRole,
+      userEmail,
+      userName,
+      isAdmin,
+      isHR,
+      isManager,
+      isAssignedManager,
+      isOwner,
+      currentPTOManagerId: currentPTO.manager_id,
+      currentPTOEmployeeId: currentPTO.employee_id
+    })
+
+    // Authorization rules for cancellation:
+    // 1. Admins can cancel any PTO request
+    // 2. HR can cancel any PTO request
+    // 3. Managers can cancel requests where they are the assigned manager
+    // 4. Employees can cancel their own requests (if still pending or approved)
+    const canCancel = isAdmin || isHR || (isManager && isAssignedManager) || isOwner
+
+    if (!canCancel) {
+      return NextResponse.json({ 
+        error: `Not authorized to cancel this request. User role: ${userRole}, Is manager: ${isManager}, Is assigned manager: ${isAssignedManager}, Is owner: ${isOwner}. Only Admins, HR, the assigned manager, or the request owner can perform this action.` 
+      }, { status: 403 })
     }
 
     // If approved, restore PTO balance and remove calendar event
     if (currentPTO.status === "approved") {
-      await sql`
-        UPDATE employees 
-        SET pto_balance = pto_balance + ${currentPTO.days_requested}
-        WHERE id = ${currentPTO.employee_id}
+      // Convert days_requested to integer for employee PTO balance update
+      const daysRequested = Math.floor(Number(currentPTO.days_requested))
+      
+      // Look up employee by email or custom ID since employee_id might be a custom code
+      const [employee] = await sql`
+        SELECT id FROM employees 
+        WHERE email = ${currentPTO.employee_id} OR id::text = ${currentPTO.employee_id}
       `
+      
+      if (employee) {
+        await sql`
+          UPDATE employees 
+          SET pto_balance = pto_balance + ${daysRequested}
+          WHERE id = ${employee.id}
+        `
+      } else {
+        console.warn("Employee not found for PTO cancellation:", currentPTO.employee_id)
+      }
 
       if (currentPTO.calendar_event_id) {
         await sql`
@@ -366,7 +537,7 @@ export async function DELETE(req: NextRequest) {
     await sql`
       UPDATE pto_requests 
       SET status = 'cancelled', updated_at = NOW()
-      WHERE id = ${id}
+      WHERE id = ${ptoId}
     `
 
     // Add audit trail entry
@@ -374,7 +545,7 @@ export async function DELETE(req: NextRequest) {
       INSERT INTO pto_audit_trail (
         pto_request_id, actor_id, actor_name, action, before_state, notes
       ) VALUES (
-        ${id}, ${session.user?.email}, ${session.user?.name || session.user?.email},
+        ${ptoId}, ${userEmail}, ${userName || userEmail},
         'cancelled', ${JSON.stringify(currentPTO)}, 'Request cancelled by user'
       )
     `

@@ -91,20 +91,25 @@ export async function POST(req: NextRequest) {
     `
 
     // Log the activity (this will also be triggered automatically, but we log it here too for API tracking)
-    await sql/* sql */`
-      SELECT log_activity_from_api(
-        ${employee_id}::uuid,
-        ${created_by || employee_id}::uuid,
-        'meeting_scheduled',
-        jsonb_build_object(
-          'meeting_title', ${title},
-          'meeting_type', ${meeting_type},
-          'scheduled_date', ${scheduledDateTime},
-          'duration', ${duration_minutes || 60},
-          'location', ${location || 'Not specified'}
+    try {
+      await sql/* sql */`
+        SELECT log_activity_from_api(
+          ${employee_id}::uuid,
+          ${created_by || employee_id}::uuid,
+          'meeting_scheduled'::text,
+          jsonb_build_object(
+            'meeting_title', ${title},
+            'meeting_type', ${meeting_type},
+            'scheduled_date', ${scheduledDateTime},
+            'duration', ${duration_minutes || 60},
+            'location', ${location || 'Not specified'}
+          )
         )
-      )
-    `
+      `
+    } catch (logError) {
+      console.error("Error logging activity:", logError)
+      // Don't fail the entire request if activity logging fails
+    }
 
     return NextResponse.json({ data: meeting })
   } catch (error) {

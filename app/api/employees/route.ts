@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth-next"
 export async function GET() {
   const sql = getSql()
   const rows = await sql /* sql */`
-    SELECT id, name, email, role, start_date, pto_balance, location, phone, department, current_performance_score
+    SELECT id, name, email, role, start_date, pto_balance, location, phone, department, current_performance_score, employment_status
     FROM employees
     ORDER BY start_date DESC
   `
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       ${body.phone},
       ${body.department}
     )
-    RETURNING id, name, email, role, start_date, pto_balance, location, phone, department, current_performance_score
+    RETURNING id, name, email, role, start_date, pto_balance, location, phone, department, current_performance_score, employment_status
   `
   return NextResponse.json({ data: row })
 }
