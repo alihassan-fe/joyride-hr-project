@@ -44,7 +44,7 @@ export async function sendNewUserWelcomeEmail(params: {
     if (webhookUrl) {
       try {
         const { triggerN8n } = await import("./n8n")
-        const fullWebhookUrl = `${webhookUrl}/invite-user`
+        const fullWebhookUrl = `${webhookUrl}/webhook/invite-user`
         console.log(`Triggering n8n webhook: ${fullWebhookUrl}`)
         await triggerN8n(fullWebhookUrl, {
           type: "new_user_welcome",
@@ -109,7 +109,7 @@ export async function sendPasswordResetEmail(params: {
     if (webhookUrl) {
       try {
         const { triggerN8n } = await import("./n8n")
-        const fullWebhookUrl = `${webhookUrl}/invite-user`
+        const fullWebhookUrl = `${webhookUrl}/webhook/invite-user`
         console.log(`Triggering n8n webhook: ${fullWebhookUrl}`)
         await triggerN8n(fullWebhookUrl, {
           type: "password_reset",
@@ -118,7 +118,7 @@ export async function sendPasswordResetEmail(params: {
           resetLink,
           subject,
           html,
-          workflow: "invite-user" // This should go to your /invite-user webhook
+          workflow: "invite-user"
         })
         console.log(`Successfully triggered n8n webhook for password reset: ${params.userEmail}`)
       } catch (webhookError) {
