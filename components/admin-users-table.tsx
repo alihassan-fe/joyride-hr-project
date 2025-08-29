@@ -253,6 +253,20 @@ useImperativeHandle(ref, () => ({
               </div>
 
               <div className="grid gap-2">
+                <Label htmlFor="email">Email</Label>
+                <Input 
+                  id="email" 
+                  name="email" 
+                  defaultValue={editing.email} 
+                  disabled={true}
+                  className="bg-muted cursor-not-allowed"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Email cannot be changed for existing users
+                </p>
+              </div>
+
+              <div className="grid gap-2">
                 <Label>Role</Label>
                 <Select
                   defaultValue={editing.role}

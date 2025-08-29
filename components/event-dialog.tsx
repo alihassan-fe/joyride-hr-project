@@ -58,6 +58,7 @@ export function EventDialog({
   const [showAttendeeSearchResults, setShowAttendeeSearchResults] = useState(false)
   const [generatingMeetLink, setGeneratingMeetLink] = useState(false)
   const [syncingGoogleCalendar, setSyncingGoogleCalendar] = useState(false)
+  const [sendingInvites, setSendingInvites] = useState(false)
   const { toast } = useToast()
 
   // Initialize draft when event changes
@@ -136,6 +137,12 @@ export function EventDialog({
   const generateGoogleMeetLink = async () => {
     setGeneratingMeetLink(true)
     try {
+      console.log("🔍 Generating Google Meet link for:", {
+        title: draft.title,
+        start: draft.start,
+        end: draft.end
+      })
+
       const response = await fetch("/api/calendar/google-meet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -148,12 +155,17 @@ export function EventDialog({
 
       if (response.ok) {
         const data = await response.json()
+        console.log("✅ Google Meet API response:", data)
+        
         setDraft((prev: any) => ({ ...prev, googleMeetLink: data.meetLink }))
+        console.log("📝 Updated draft with Google Meet link:", data.meetLink)
+        
         toast({
           title: "Success",
           description: "Google Meet link generated successfully",
         })
       } else {
+        console.error("❌ Google Meet API failed:", response.status, response.statusText)
         toast({
           title: "Error",
           description: "Failed to generate Google Meet link",
@@ -161,6 +173,7 @@ export function EventDialog({
         })
       }
     } catch (error) {
+      console.error("❌ Google Meet generation error:", error)
       toast({
         title: "Error",
         description: "Failed to generate Google Meet link",
@@ -178,7 +191,7 @@ export function EventDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          eventId: draft.id,
+          event_id: draft.id,
           title: draft.title,
           description: draft.description,
           start: draft.start,
@@ -223,6 +236,7 @@ export function EventDialog({
       return
     }
 
+    // If we have a Google Meet link in the draft, make sure it's passed to the API
     const eventData = {
       ...draft,
       type: draft.type || "interview", // Ensure type is always set
@@ -233,12 +247,23 @@ export function EventDialog({
         attendee_id: a.id, 
         attendee_name: a.name, 
         attendee_email: a.email 
-      }))
+      })),
+      // Pass Google Meet link if available
+      google_meet_url: draft.googleMeetLink || draft.google_meet_url,
+      // If we have a Google Meet link, also set generate_google_meet to true
+      generate_google_meet: !!(draft.googleMeetLink || draft.google_meet_url)
     }
 
+    console.log("🚀 Sending event data to API:", eventData)
+    console.log("🔍 Google Meet link in eventData:", eventData.google_meet_url)
+    console.log("🔍 generate_google_meet flag:", eventData.generate_google_meet)
+
     if (draft.id) {
+      // For updates, we need to ensure the Google Meet link is properly saved
+      console.log("🔄 Updating existing event with ID:", draft.id)
       onEventUpdate(eventData)
     } else {
+      console.log("🆕 Creating new event")
       onEventCreate(eventData)
     }
     onOpenChange(false)
@@ -254,6 +279,7 @@ export function EventDialog({
   }
 
   const sendInvites = async () => {
+    setSendingInvites(true)
     try {
       const response = await fetch("/api/calendar/notify", {
         method: "POST",
@@ -269,6 +295,9 @@ export function EventDialog({
           title: "Success",
           description: "Invites sent successfully",
         })
+        // Close the dialog after successful send
+        onOpenChange(false)
+        resetForm()
       } else {
         toast({
           title: "Error",
@@ -282,6 +311,8 @@ export function EventDialog({
         description: "Failed to send invites",
         variant: "destructive",
       })
+    } finally {
+      setSendingInvites(false)
     }
   }
 
@@ -427,42 +458,56 @@ export function EventDialog({
           </div>
 
           {/* Google Meet Integration */}
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={generateGoogleMeetLink}
-              disabled={generatingMeetLink || !draft.title || !draft.start || !draft.end}
-            >
-              <Video className="h-4 w-4 mr-2" />
-              {generatingMeetLink ? "Generating..." : "Generate Google Meet"}
-            </Button>
-            {draft.googleMeetLink && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Video className="h-3 w-3" />
-                Meet Link Ready
-              </Badge>
-            )}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={generateGoogleMeetLink}
+                disabled={generatingMeetLink || !draft.title || !draft.start || !draft.end}
+              >
+                <Video className="h-4 w-4 mr-2" />
+                {generatingMeetLink ? "Generating..." : "Generate Google Meet"}
+              </Button>
+              {draft.googleMeetLink && (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <Video className="h-3 w-3" />
+                  Meet Link Ready
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Generate a Google Meet link for this event. The link will be included in email invitations 
+              and can be used for video conferencing.
+            </p>
           </div>
 
-          {/* Google Calendar Sync */}
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={syncWithGoogleCalendar}
-              disabled={syncingGoogleCalendar || !draft.id}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              {syncingGoogleCalendar ? "Syncing..." : "Sync to Google Calendar"}
-            </Button>
-            {draft.googleCalendarId && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                Synced to Google Calendar
-              </Badge>
-            )}
+          {/* Google Calendar Sync - Currently Disabled (Placeholder Only) */}
+          {/* 
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={syncWithGoogleCalendar}
+                disabled={syncingGoogleCalendar || !draft.id}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                {syncingGoogleCalendar ? "Syncing..." : "Sync to Google Calendar"}
+              </Button>
+              {draft.googleCalendarId && (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  Synced to Google Calendar
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This will create/update the event in Google Calendar and send invites to all attendees. 
+              The .ics file will also be included in email notifications.
+            </p>
           </div>
+          */}
         </div>
 
         <DialogFooter className="flex justify-between">
@@ -479,9 +524,9 @@ export function EventDialog({
               Cancel
             </Button>
             <Button onClick={upsertEvent}>{draft?.id ? "Update" : "Create"}</Button>
-            <Button onClick={sendInvites} disabled={!draft?.id} variant="secondary">
+            <Button onClick={sendInvites} disabled={!draft?.id || sendingInvites} variant="secondary">
               <Mail className="h-4 w-4 mr-2" />
-              Send Invites
+              {sendingInvites ? "Sending..." : "Send Invites"}
             </Button>
           </div>
         </DialogFooter>

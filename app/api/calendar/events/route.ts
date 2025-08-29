@@ -157,6 +157,8 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
+    console.log("📥 Received event creation request:", body)
+    
     const {
       title,
       type,
@@ -173,8 +175,12 @@ export async function POST(req: NextRequest) {
       tags = [],
       meta = {},
       attendees = [],
-      generate_google_meet = false
+      generate_google_meet = false,
+      google_meet_url = null
     } = body
+
+    console.log("🔍 Extracted google_meet_url:", google_meet_url)
+    console.log("🔍 Extracted generate_google_meet:", generate_google_meet)
 
     if (!title || !type || !start_time || !end_time) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -185,15 +191,18 @@ export async function POST(req: NextRequest) {
       INSERT INTO calendar_events (
         title, type, start_time, end_time, all_day, description, location,
         timezone, organizer_id, pre_buffer_minutes, post_buffer_minutes,
-        reminder_minutes, tags, meta, created_by, status
+        reminder_minutes, tags, meta, created_by, status, google_meet_url
       ) VALUES (
         ${title}, ${type}, ${start_time}::timestamptz, ${end_time}::timestamptz,
         ${all_day}, ${description || null}, ${location || null},
         ${timezone}, ${organizer_id || session.user?.email}, ${pre_buffer_minutes},
         ${post_buffer_minutes}, ${reminder_minutes}, ${tags}, ${meta},
-        ${session.user?.email}, 'scheduled'
-      ) RETURNING id
+        ${session.user?.email}, 'scheduled', ${google_meet_url}
+      ) RETURNING id, google_meet_url
     `
+
+    console.log("✅ Event created in database:", event)
+    console.log("🔍 Saved google_meet_url:", event.google_meet_url)
 
     const eventId = event.id
 
@@ -294,11 +303,17 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json()
+    console.log("📥 Received event update request:", body)
+    
     const { id, ...updateData } = body
 
     if (!id) {
       return NextResponse.json({ error: "Event ID required" }, { status: 400 })
     }
+
+    console.log("🔍 Updating event ID:", id)
+    console.log("🔍 Update data:", updateData)
+    console.log("🔍 Google Meet URL in update:", updateData.google_meet_url)
 
     // Get current event state for audit trail
     const [currentEvent] = await sql`
@@ -319,10 +334,14 @@ export async function PUT(req: NextRequest) {
         description = COALESCE(${updateData.description}, description),
         location = COALESCE(${updateData.location}, location),
         status = COALESCE(${updateData.status}, status),
+        google_meet_url = COALESCE(${updateData.google_meet_url}, google_meet_url),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
     `
+
+    console.log("✅ Event updated in database:", updatedEvent)
+    console.log("🔍 Updated google_meet_url:", updatedEvent.google_meet_url)
 
     // Add audit trail entry
     await sql`

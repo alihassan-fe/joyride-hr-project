@@ -22,12 +22,14 @@ export async function POST(req: Request) {
         start_time: string
         end_time: string
         meta: any
+        google_meet_url: string | null
       }[]
     >`
       SELECT id, title, type, description, location,
              to_char(start_time AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') as start_time,
              to_char(end_time   AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"') as end_time,
-             COALESCE(meta,'{}'::jsonb) as meta
+             COALESCE(meta,'{}'::jsonb) as meta,
+             google_meet_url
       FROM calendar_events
       WHERE id = ${event_id}
       LIMIT 1
@@ -61,7 +63,7 @@ export async function POST(req: Request) {
       startISO: event.start_time,
       endISO: event.end_time,
       videoLink: meta.videoLink,
-      googleMeetLink: meta.googleMeetLink,
+      googleMeetLink: event.google_meet_url || meta.googleMeetLink,
       message,
       attendees: recipients,
     })
@@ -111,7 +113,7 @@ export async function POST(req: Request) {
       event,
       html,
       ics,
-      googleMeetLink: meta.googleMeetLink,
+      googleMeetLink: event.google_meet_url || meta.googleMeetLink,
     }
 
     let messageId: string | null = null
