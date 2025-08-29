@@ -48,6 +48,7 @@ const AdminUsersTable = forwardRef<AdminUsersTableRef, Props>(({ initialUsers, o
   const [saving, setSaving] = useState(false)
   const [resetPassword, setResetPassword] = useState<{ id: string; email: string; name: string } | null>(null)
   const [resettingPassword, setResettingPassword] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
 const sorted = useMemo(() => {
   return [...users].sort((a, b) => {
@@ -69,6 +70,7 @@ useImperativeHandle(ref, () => ({
 
 
   async function handleDelete(id: string) {
+    setDeleting(true)
     try {
       const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE" })
       if (!res.ok) {
@@ -84,6 +86,7 @@ useImperativeHandle(ref, () => ({
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Delete failed" })
     } finally {
+      setDeleting(false)
       setConfirm(null)
     }
   }
@@ -208,7 +211,7 @@ useImperativeHandle(ref, () => ({
       </Table>
 
       {/* Delete confirm */}
-      <Dialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+      <Dialog open={!!confirm} onOpenChange={(o) => !o && !deleting && setConfirm(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete user</DialogTitle>
@@ -217,11 +220,19 @@ useImperativeHandle(ref, () => ({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setConfirm(null)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setConfirm(null)}
+              disabled={deleting}
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={() => confirm && handleDelete(confirm.id)}>
-              Delete
+            <Button 
+              variant="destructive" 
+              onClick={() => confirm && handleDelete(confirm.id)}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -286,7 +297,7 @@ useImperativeHandle(ref, () => ({
       </Dialog>
 
       {/* Reset password confirm */}
-      <Dialog open={!!resetPassword} onOpenChange={(o) => !o && setResetPassword(null)}>
+      <Dialog open={!!resetPassword} onOpenChange={(o) => !o && !resettingPassword && setResetPassword(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Send password reset email</DialogTitle>
