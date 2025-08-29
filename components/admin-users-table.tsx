@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useImperativeHandle, forwardRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { Trash2, Pencil } from "lucide-react"
+import { Trash2, Pencil, Key } from "lucide-react"
 
 export type UserRow = {
   id: string
@@ -32,14 +32,22 @@ const ROLES = ["Admin", "Manager", "HR"] as const
 
 type Props = {
   initialUsers: UserRow[]
+  onRefresh?: () => void
+  isLoading?: boolean
 }
 
-export default function AdminUsersTable({ initialUsers }: Props) {
+export interface AdminUsersTableRef {
+  addUser: (user: UserRow) => void
+}
+
+const AdminUsersTable = forwardRef<AdminUsersTableRef, Props>(({ initialUsers, onRefresh, isLoading }, ref) => {
   const { toast } = useToast()
   const [users, setUsers] = useState<UserRow[]>(initialUsers || [])
   const [confirm, setConfirm] = useState<{ id: string; email: string } | null>(null)
   const [editing, setEditing] = useState<UserRow | null>(null)
   const [saving, setSaving] = useState(false)
+  const [resetPassword, setResetPassword] = useState<{ id: string; email: string; name: string } | null>(null)
+  const [resettingPassword, setResettingPassword] = useState(false)
 
 const sorted = useMemo(() => {
   return [...users].sort((a, b) => {
@@ -48,6 +56,16 @@ const sorted = useMemo(() => {
     return bTime - aTime; // descending order
   });
 }, [users]);
+
+// Function to add a new user to the table
+const addUser = (newUser: UserRow) => {
+  setUsers(prev => [newUser, ...prev])
+}
+
+// Expose addUser function to parent component
+useImperativeHandle(ref, () => ({
+  addUser
+}))
 
 
   async function handleDelete(id: string) {
@@ -59,6 +77,10 @@ const sorted = useMemo(() => {
       }
       setUsers((prev) => prev.filter((u) => u.id !== id))
       toast({ title: "User deleted" })
+      // Call refresh callback if provided
+      if (onRefresh) {
+        onRefresh()
+      }
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Delete failed" })
     } finally {
@@ -88,10 +110,42 @@ const sorted = useMemo(() => {
       setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, ...data } : u)))
       toast({ title: "User updated", description: `${data.email} (${data.role})` })
       setEditing(null)
+      // Call refresh callback if provided
+      if (onRefresh) {
+        onRefresh()
+      }
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Update failed" })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!resetPassword) return
+    
+    setResettingPassword(true)
+    try {
+      const res = await fetch("/api/auth/request-password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resetPassword.email }),
+      })
+
+      if (res.ok) {
+        toast({ 
+          title: "Password reset email sent", 
+          description: `Reset link sent to ${resetPassword.email}` 
+        })
+      } else {
+        const data = await res.json()
+        throw new Error(data?.error || "Failed to send reset email")
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Reset failed" })
+    } finally {
+      setResettingPassword(false)
+      setResetPassword(null)
     }
   }
 
@@ -120,6 +174,14 @@ const sorted = useMemo(() => {
                     <Pencil className="mr-1 h-4 w-4" />
                     Edit
                   </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setResetPassword({ id: u.id, email: u.email, name: u.name || u.email.split("@")[0] })}
+                  >
+                    <Key className="mr-1 h-4 w-4" />
+                    Reset
+                  </Button>
                   <Button variant="destructive" size="sm" onClick={() => setConfirm({ id: u.id, email: u.email })}>
                     <Trash2 className="mr-1 h-4 w-4" />
                     Delete
@@ -128,10 +190,17 @@ const sorted = useMemo(() => {
               </TableCell>
             </TableRow>
           ))}
-          {sorted.length === 0 && (
+          {sorted.length === 0 && !isLoading && (
             <TableRow>
               <TableCell colSpan={4} className="text-sm text-muted-foreground">
                 No users found.
+              </TableCell>
+            </TableRow>
+          )}
+          {isLoading && (
+            <TableRow>
+              <TableCell colSpan={4} className="text-sm text-muted-foreground">
+                Loading users...
               </TableCell>
             </TableRow>
           )}
@@ -215,6 +284,35 @@ const sorted = useMemo(() => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Reset password confirm */}
+      <Dialog open={!!resetPassword} onOpenChange={(o) => !o && setResetPassword(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send password reset email</DialogTitle>
+            <DialogDescription>
+              {resetPassword ? `Send a password reset link to ${resetPassword.email}?` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setResetPassword(null)}
+              disabled={resettingPassword}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleResetPassword}
+              disabled={resettingPassword}
+            >
+              {resettingPassword ? "Sending..." : "Send Reset Link"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
-}
+})
+
+export default AdminUsersTable

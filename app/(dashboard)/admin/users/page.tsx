@@ -1,25 +1,69 @@
-import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth-next"
-import { sql } from "@/lib/sql"
+"use client"
+
+import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CreateUserForm } from "@/components/create-user-form"
-import AdminUsersTable, { type UserRow } from "@/components/admin-users-table"
+import AdminUsersTable, { type UserRow, type AdminUsersTableRef } from "@/components/admin-users-table"
 
-async function loadUsers(): Promise<UserRow[]> {
-  const rows = await sql<
-    UserRow[]
-  >`select id::text, email, name, role, created_at from users order by created_at desc nulls last limit 200`
-  return rows
-}
+// Client component wrapper for admin users page
+export default function AdminUsersPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  const [users, setUsers] = useState<UserRow[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const tableRef = useRef<AdminUsersTableRef>(null)
 
-export default async function AdminUsersPage() {
-  const session = await auth()
-  const role = (session?.user as any)?.role as string | undefined
-  if (!session?.user || role !== "Admin") {
-    redirect("/dashboard")
+  // Check authentication and role
+  useEffect(() => {
+    if (status === "loading") return
+    
+    if (!session?.user || (session.user as any)?.role !== "Admin") {
+      router.push("/dashboard")
+      return
+    }
+    
+    loadUsers()
+  }, [session, status, router])
+
+  async function loadUsers() {
+    try {
+      setIsLoading(true)
+      const response = await fetch('/api/admin/users')
+      if (response.ok) {
+        const data = await response.json()
+        setUsers(data || [])
+      }
+    } catch (error) {
+      console.error('Failed to load users:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const users = await loadUsers()
+  const handleUserCreated = (newUser: UserRow) => {
+    // Add the new user to the table
+    if (tableRef.current) {
+      tableRef.current.addUser(newUser)
+    }
+  }
+
+  const handleRefresh = () => {
+    loadUsers()
+  }
+
+  // Show loading state while checking authentication
+  if (status === "loading" || isLoading) {
+    return (
+      <main className="flex-1 p-4 md:p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Admin Users</h1>
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="flex-1 p-4 md:p-6 space-y-6">
@@ -36,7 +80,12 @@ export default async function AdminUsersPage() {
             <CardDescription>Latest 200 users. Edit roles, reset passwords, or delete.</CardDescription>
           </CardHeader>
           <CardContent>
-            <AdminUsersTable initialUsers={users} />
+            <AdminUsersTable 
+              ref={tableRef}
+              initialUsers={users} 
+              onRefresh={handleRefresh}
+              isLoading={isLoading}
+            />
           </CardContent>
         </Card>
 
@@ -47,7 +96,7 @@ export default async function AdminUsersPage() {
             <CardDescription>New users will log in with email/password. Assign a role.</CardDescription>
           </CardHeader>
           <CardContent>
-            <CreateUserForm />
+            <CreateUserForm onUserCreated={handleUserCreated} />
           </CardContent>
         </Card>
       </div>

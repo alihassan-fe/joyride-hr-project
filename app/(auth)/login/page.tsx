@@ -3,9 +3,11 @@
 import { type FormEvent, useState } from "react"
 import { signIn } from "next-auth/react"
 import { useSearchParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -52,9 +54,8 @@ export default function LoginPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -64,6 +65,14 @@ export default function LoginPage() {
               {loading === "credentials" ? "Signing in..." : "Sign in"}
             </Button>
           </form>
+          <div className="text-center">
+            <Link
+              href="/request-password-reset"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Forgot your password?
+            </Link>
+          </div>
           {/* <div className="flex items-center gap-2">
             <Separator className="flex-1" />
             <span className="text-xs text-muted-foreground">or</span>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { neon } from "@neondatabase/serverless"
 import { auth } from "@/lib/auth-next"
+import { sendNewUserWelcomeEmail } from "@/lib/user-notifications"
 
 const sql = neon(process.env.DATABASE_URL as string)
 
@@ -61,7 +62,23 @@ export async function POST(req: Request) {
     if (rows.length === 0) {
       return NextResponse.json({ error: "User already exists" }, { status: 409 })
     }
-    return NextResponse.json({ data: rows[0] }, { status: 201 })
+
+    // Send welcome email to new user
+    const newUser = rows[0]
+    const adminName = (session?.user as any)?.name || "System Administrator"
+    
+    try {
+      await sendNewUserWelcomeEmail({
+        userEmail: newUser.email,
+        userName: newUser.name || newUser.email.split("@")[0],
+        adminName
+      })
+    } catch (emailError) {
+      console.error("Failed to send welcome email:", emailError)
+      // Don't fail the user creation if email fails
+    }
+
+    return NextResponse.json({ data: newUser }, { status: 201 })
   } catch (e: any) {
     // 23505 unique_violation
     if (e?.code === "23505") {

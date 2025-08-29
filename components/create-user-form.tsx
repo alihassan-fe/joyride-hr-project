@@ -5,13 +5,18 @@ import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 
 const ROLES = ["Admin", "Manager", "HR"] as const
 
-export function CreateUserForm() {
+interface CreateUserFormProps {
+  onUserCreated?: (user: { id: string; email: string; name: string | null; role: string; created_at: string | null }) => void
+}
+
+export function CreateUserForm({ onUserCreated }: CreateUserFormProps) {
   const { toast } = useToast()
   const [email, setEmail] = useState("")
   const [name, setName] = useState("")
@@ -45,6 +50,12 @@ export function CreateUserForm() {
       }
 
       toast({ title: "User created", description: `${data.data.email} (${data.data.role})` })
+      
+      // Call the callback to notify parent component
+      if (onUserCreated && data.data) {
+        onUserCreated(data.data)
+      }
+      
       setEmail("")
       setName("")
       setRole("Admin")
@@ -93,9 +104,8 @@ export function CreateUserForm() {
 
       <div className="grid gap-2">
         <Label htmlFor="password">Temporary password</Label>
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           placeholder="At least 8 characters"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
